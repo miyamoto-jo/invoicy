@@ -1,0 +1,25 @@
+{
+  "name": "Invoicy",
+  "short_name": "Invoicy",
+  "description": "Google Driveを使用した請求書管理システム",
+  "start_url": "/invoicy/",
+  "scope": "/invoicy/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4285f4",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/invoicy/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/invoicy/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+} 

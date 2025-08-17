@@ -96,5 +96,6 @@ jspm_packages/
 # TernJS port file
 .tern-port
 
+# Documents
 docs/ minutes
 docs/references

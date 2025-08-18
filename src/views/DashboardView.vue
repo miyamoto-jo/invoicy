@@ -63,6 +63,9 @@
             <div class="info-item">
               <strong>データ保存先:</strong> Google Drive
             </div>
+            <div class="info-item">
+              <strong>顧客数:</strong> {{ customersStore.customersCount }}件
+            </div>
           </div>
         </div>
       </div>
@@ -71,11 +74,23 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useCustomersStore } from '../stores/customers'
 import { useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
+const customersStore = useCustomersStore()
 const router = useRouter()
+
+onMounted(async () => {
+  // 顧客データを初期化
+  try {
+    await customersStore.initializeCustomers()
+  } catch (err) {
+    console.error('Failed to initialize customers:', err)
+  }
+})
 
 const handleSignOut = async () => {
   authStore.signOut()

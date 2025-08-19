@@ -17,7 +17,7 @@ export const useAuthStore = defineStore('auth', () => {
     'openid',
     'email',
     'profile',
-    'https://www.googleapis.com/auth/drive'
+    'https://www.googleapis.com/auth/drive.file'
   ].join(' ')
   
   // App folder configuration
@@ -265,6 +265,9 @@ export const useAuthStore = defineStore('auth', () => {
       // セッションストレージからトークンを削除
       sessionStorage.removeItem('google_access_token')
       
+      // ローカルストレージからフォルダIDを削除
+      localStorage.removeItem('invoicy_app_folder_id')
+      
       // Google Identity Servicesのサインアウト
       if (window.google && window.google.accounts) {
         window.google.accounts.oauth2.revoke(
@@ -296,39 +299,16 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('📋 App folder name:', APP_FOLDER_NAME)
       console.log('🔑 Token available:', !!token)
       
-      // アプリフォルダを検索
-      const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${APP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
-      console.log('🔗 Search URL:', searchUrl)
+      // ローカルストレージからフォルダIDを確認
+      const savedFolderId = localStorage.getItem('invoicy_app_folder_id')
       
-      const response = await fetch(searchUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      console.log('📡 Search response status:', response.status)
-      console.log('📡 Search response ok:', response.ok)
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ Search response error:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText: errorText
-        })
-        throw new Error(`フォルダの検索に失敗しました: ${response.status} ${response.statusText}`)
+      if (savedFolderId) {
+        console.log('✅ Using saved folder ID:', savedFolderId)
+        return { id: savedFolderId }
       }
       
-      const data = await response.json()
-      console.log('📄 Search response data:', data)
-      
-      if (data.files && data.files.length > 0) {
-        console.log('✅ App folder found:', data.files[0].id)
-        return data.files[0]
-      }
-      
-      // アプリフォルダを作成
-      console.log('📁 Creating app folder...')
+      // フォルダIDがない場合は新規作成
+      console.log('📁 Creating new app folder...')
       const createPayload = {
         name: APP_FOLDER_NAME,
         mimeType: 'application/vnd.google-apps.folder'
@@ -360,6 +340,11 @@ export const useAuthStore = defineStore('auth', () => {
       const newFolder = await createResponse.json()
       console.log('✅ App folder created:', newFolder.id)
       console.log('📄 Create response data:', newFolder)
+      
+      // フォルダIDをローカルストレージに保存
+      localStorage.setItem('invoicy_app_folder_id', newFolder.id)
+      console.log('💾 Folder ID saved to localStorage')
+      
       return newFolder
       
     } catch (err) {

@@ -9,8 +9,17 @@
           placeholder="顧客名、管理用名称、住所で検索..."
         />
       </div>
-      <div class="stats">
-        <span class="stats-text">{{ filteredCustomers.length }}件</span>
+      <div class="header-actions">
+        <button
+          @click="$emit('bulk-create')"
+          class="btn btn-primary"
+          :disabled="isLoading"
+        >
+          📋 一括登録
+        </button>
+        <div class="stats">
+          <span class="stats-text">{{ filteredCustomers.length }}件</span>
+        </div>
       </div>
     </div>
     
@@ -100,7 +109,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select', 'edit', 'delete', 'retry'])
+const emit = defineEmits(['select', 'edit', 'delete', 'retry', 'bulk-create'])
 
 const customersStore = useCustomersStore()
 const searchQuery = ref('')
@@ -152,6 +161,12 @@ watch(searchQuery, (newQuery) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  gap: 20px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
   gap: 20px;
 }
 
@@ -298,6 +313,34 @@ watch(searchQuery, (newQuery) => {
 
 .btn-icon.delete:hover {
   background-color: #fde8e8;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: #4285f4;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #3367d6;
 }
 
 .customer-details {

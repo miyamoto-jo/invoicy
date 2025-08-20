@@ -34,11 +34,11 @@
 ### 3.1 フォルダ構成
 
 - ルート：`/Invoicy/`（初回起動時に存在確認→なければ作成）
+  - `settings.json`  … 設定（アプリ設定を1ファイルで管理）
   - `masters/`
     - `customers.json` … 顧客マスター（全顧客データを1ファイルで管理）
     - `products.json`  … 商品マスター（全商品データを1ファイルで管理）
     - `taxes.json`     … 税率マスター（全税率データを1ファイルで管理）
-    - `settings.json`  … 設定（アプリ設定を1ファイルで管理）
   - `sales/`
     - 伝票（売上）1 件 = 1 ファイル（`{YYYYMMDD}_{customerId}_{ticketId}.json`）
   - `invoices/`

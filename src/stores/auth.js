@@ -23,6 +23,11 @@ export const useAuthStore = defineStore('auth', () => {
   // App folder configuration
   const APP_FOLDER_NAME = import.meta.env.VITE_APP_FOLDER_NAME || 'Invoicy'
   
+  // Sub folders to create in the app folder
+  const SUB_FOLDERS = [
+    'masters'
+  ]
+  
   // Computed
   const userEmail = computed(() => user.value?.email || '')
   const userName = computed(() => user.value?.name || '')
@@ -268,6 +273,11 @@ export const useAuthStore = defineStore('auth', () => {
       // ローカルストレージからフォルダIDを削除
       localStorage.removeItem('invoicy_app_folder_id')
       
+      // サブフォルダIDを削除
+      for (const folderName of SUB_FOLDERS) {
+        localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+      }
+      
       // Google Identity Servicesのサインアウト
       if (window.google && window.google.accounts) {
         window.google.accounts.oauth2.revoke(
@@ -320,6 +330,9 @@ export const useAuthStore = defineStore('auth', () => {
           localStorage.setItem('invoicy_app_folder_id', existingFolder.id)
           console.log('💾 Existing folder ID saved to localStorage')
           
+          // サブフォルダの確認・作成
+          await ensureSubFolders(token, existingFolder.id)
+          
           return existingFolder
         }
       }
@@ -341,6 +354,10 @@ export const useAuthStore = defineStore('auth', () => {
           const folderInfo = await verifyResponse.json()
           if (!folderInfo.trashed && folderInfo.name === APP_FOLDER_NAME) {
             console.log('✅ Saved folder ID is valid:', savedFolderId)
+            
+            // サブフォルダの確認・作成
+            await ensureSubFolders(token, savedFolderId)
+            
             return { id: savedFolderId }
           } else {
             console.log('⚠️ Saved folder is trashed or has wrong name, removing from localStorage')
@@ -390,10 +407,144 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('invoicy_app_folder_id', newFolder.id)
       console.log('💾 Folder ID saved to localStorage')
       
+      // サブフォルダの作成
+      await ensureSubFolders(token, newFolder.id)
+      
       return newFolder
       
     } catch (err) {
       console.error('❌ Failed to ensure app folder:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      })
+      throw err
+    }
+  }
+  
+  // サブフォルダの確認・作成
+  const ensureSubFolders = async (token, parentFolderId) => {
+    try {
+      console.log('🔍 Checking sub folders...')
+      console.log('📁 Parent folder ID:', parentFolderId)
+      console.log('📋 Sub folders to create:', SUB_FOLDERS)
+      
+      for (const folderName of SUB_FOLDERS) {
+        await ensureSingleSubFolder(token, parentFolderId, folderName)
+      }
+      
+      console.log('✅ All sub folders ensured')
+      
+    } catch (err) {
+      console.error('❌ Failed to ensure sub folders:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      })
+      throw err
+    }
+  }
+  
+  // 単一のサブフォルダの確認・作成
+  const ensureSingleSubFolder = async (token, parentFolderId, folderName) => {
+    try {
+      console.log(`🔍 Checking ${folderName} folder...`)
+      
+      // 既存のフォルダを検索
+      const searchQuery = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`
+      const searchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name)`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (searchResponse.ok) {
+        const searchResult = await searchResponse.json()
+        console.log(`📄 ${folderName} folder search result:`, searchResult)
+        
+        if (searchResult.files && searchResult.files.length > 0) {
+          const existingFolder = searchResult.files[0]
+          console.log(`✅ Found existing ${folderName} folder:`, existingFolder.id)
+          
+          // ローカルストレージに保存
+          localStorage.setItem(`invoicy_${folderName}_folder_id`, existingFolder.id)
+          console.log(`💾 ${folderName} folder ID saved to localStorage`)
+          
+          return existingFolder
+        }
+      }
+      
+      // ローカルストレージからフォルダIDを確認
+      const savedFolderId = localStorage.getItem(`invoicy_${folderName}_folder_id`)
+      
+      if (savedFolderId) {
+        console.log(`🔍 Verifying saved ${folderName} folder ID:`, savedFolderId)
+        
+        // 保存されたフォルダIDの存在確認
+        const verifyResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        
+        if (verifyResponse.ok) {
+          const folderInfo = await verifyResponse.json()
+          if (!folderInfo.trashed && folderInfo.name === folderName) {
+            console.log(`✅ Saved ${folderName} folder ID is valid:`, savedFolderId)
+            return { id: savedFolderId }
+          } else {
+            console.log(`⚠️ Saved ${folderName} folder is trashed or has wrong name, removing from localStorage`)
+            localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+          }
+        } else {
+          console.log(`⚠️ Saved ${folderName} folder ID is invalid, removing from localStorage`)
+          localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+        }
+      }
+      
+      // フォルダがない場合は新規作成
+      console.log(`📁 Creating new ${folderName} folder...`)
+      const createPayload = {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [parentFolderId]
+      }
+      console.log(`📦 ${folderName} folder create payload:`, createPayload)
+      
+      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(createPayload)
+      })
+      
+      console.log(`📡 ${folderName} folder create response status:`, createResponse.status)
+      console.log(`📡 ${folderName} folder create response ok:`, createResponse.ok)
+      
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text()
+        console.error(`❌ ${folderName} folder create response error:`, {
+          status: createResponse.status,
+          statusText: createResponse.statusText,
+          errorText: errorText
+        })
+        throw new Error(`${folderName}フォルダの作成に失敗しました: ${createResponse.status} ${createResponse.statusText}`)
+      }
+      
+      const newFolder = await createResponse.json()
+      console.log(`✅ ${folderName} folder created:`, newFolder.id)
+      console.log(`📄 ${folderName} folder create response data:`, newFolder)
+      
+      // フォルダIDをローカルストレージに保存
+      localStorage.setItem(`invoicy_${folderName}_folder_id`, newFolder.id)
+      console.log(`💾 ${folderName} folder ID saved to localStorage`)
+      
+      return newFolder
+      
+    } catch (err) {
+      console.error(`❌ Failed to ensure ${folderName} folder:`, {
         message: err.message,
         stack: err.stack,
         name: err.name
@@ -446,6 +597,55 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
   
+  // サブフォルダIDの取得（ローカルストレージから取得し、必要に応じて検証）
+  const getSubFolderId = async (folderName) => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('認証トークンがありません')
+    }
+    
+    // フォルダ名の検証
+    if (!SUB_FOLDERS.includes(folderName)) {
+      throw new Error(`無効なフォルダ名です: ${folderName}`)
+    }
+    
+    // ローカルストレージからフォルダIDを取得
+    const savedFolderId = localStorage.getItem(`invoicy_${folderName}_folder_id`)
+    
+    if (!savedFolderId) {
+      throw new Error(`${folderName}フォルダIDが保存されていません。ログインしてください。`)
+    }
+    
+    // フォルダIDの有効性を検証
+    try {
+      const verifyResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (verifyResponse.ok) {
+        const folderInfo = await verifyResponse.json()
+        if (!folderInfo.trashed && folderInfo.name === folderName) {
+          console.log(`✅ Using saved ${folderName} folder ID:`, savedFolderId)
+          return { id: savedFolderId }
+        } else {
+          console.log(`⚠️ Saved ${folderName} folder is trashed or has wrong name`)
+          localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+          throw new Error(`保存された${folderName}フォルダが無効です。ログインしてください。`)
+        }
+      } else {
+        console.log(`⚠️ Saved ${folderName} folder ID is invalid`)
+        localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+        throw new Error(`保存された${folderName}フォルダが見つかりません。ログインしてください。`)
+      }
+    } catch (err) {
+      console.error(`Failed to verify ${folderName} folder ID:`, err)
+      localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+      throw new Error(`${folderName}フォルダの検証に失敗しました。ログインしてください。`)
+    }
+  }
+  
   return {
     // State
     user,
@@ -463,6 +663,7 @@ export const useAuthStore = defineStore('auth', () => {
     signOut,
     getAccessToken,
     ensureAppFolder,
-    getAppFolderId
+    getAppFolderId,
+    getSubFolderId
   }
 }) 

@@ -299,15 +299,60 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('📋 App folder name:', APP_FOLDER_NAME)
       console.log('🔑 Token available:', !!token)
       
+      // まず既存のフォルダを検索
+      console.log('🔍 Searching for existing app folder...')
+      const searchQuery = `name='${APP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+      const searchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name)`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (searchResponse.ok) {
+        const searchResult = await searchResponse.json()
+        console.log('📄 Search result:', searchResult)
+        
+        if (searchResult.files && searchResult.files.length > 0) {
+          const existingFolder = searchResult.files[0]
+          console.log('✅ Found existing app folder:', existingFolder.id)
+          
+          // ローカルストレージに保存
+          localStorage.setItem('invoicy_app_folder_id', existingFolder.id)
+          console.log('💾 Existing folder ID saved to localStorage')
+          
+          return existingFolder
+        }
+      }
+      
       // ローカルストレージからフォルダIDを確認
       const savedFolderId = localStorage.getItem('invoicy_app_folder_id')
       
       if (savedFolderId) {
-        console.log('✅ Using saved folder ID:', savedFolderId)
-        return { id: savedFolderId }
+        console.log('🔍 Verifying saved folder ID:', savedFolderId)
+        
+        // 保存されたフォルダIDの存在確認
+        const verifyResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        
+        if (verifyResponse.ok) {
+          const folderInfo = await verifyResponse.json()
+          if (!folderInfo.trashed && folderInfo.name === APP_FOLDER_NAME) {
+            console.log('✅ Saved folder ID is valid:', savedFolderId)
+            return { id: savedFolderId }
+          } else {
+            console.log('⚠️ Saved folder is trashed or has wrong name, removing from localStorage')
+            localStorage.removeItem('invoicy_app_folder_id')
+          }
+        } else {
+          console.log('⚠️ Saved folder ID is invalid, removing from localStorage')
+          localStorage.removeItem('invoicy_app_folder_id')
+        }
       }
       
-      // フォルダIDがない場合は新規作成
+      // フォルダIDがない場合または無効な場合は新規作成
       console.log('📁 Creating new app folder...')
       const createPayload = {
         name: APP_FOLDER_NAME,
@@ -357,14 +402,48 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
   
-  // アプリフォルダIDの取得
+  // アプリフォルダIDの取得（ローカルストレージから取得し、必要に応じて検証）
   const getAppFolderId = async () => {
     const token = getAccessToken()
     if (!token) {
       throw new Error('認証トークンがありません')
     }
     
-    return await ensureAppFolder(token)
+    // ローカルストレージからフォルダIDを取得
+    const savedFolderId = localStorage.getItem('invoicy_app_folder_id')
+    
+    if (!savedFolderId) {
+      throw new Error('アプリフォルダIDが保存されていません。ログインしてください。')
+    }
+    
+    // フォルダIDの有効性を検証
+    try {
+      const verifyResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (verifyResponse.ok) {
+        const folderInfo = await verifyResponse.json()
+        if (!folderInfo.trashed && folderInfo.name === APP_FOLDER_NAME) {
+          console.log('✅ Using saved folder ID:', savedFolderId)
+          return { id: savedFolderId }
+        } else {
+          console.log('⚠️ Saved folder is trashed or has wrong name')
+          localStorage.removeItem('invoicy_app_folder_id')
+          throw new Error('保存されたフォルダが無効です。ログインしてください。')
+        }
+      } else {
+        console.log('⚠️ Saved folder ID is invalid')
+        localStorage.removeItem('invoicy_app_folder_id')
+        throw new Error('保存されたフォルダが見つかりません。ログインしてください。')
+      }
+    } catch (err) {
+      console.error('Failed to verify folder ID:', err)
+      localStorage.removeItem('invoicy_app_folder_id')
+      throw new Error('フォルダの検証に失敗しました。ログインしてください。')
+    }
   }
   
   return {

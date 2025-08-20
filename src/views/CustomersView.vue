@@ -29,12 +29,21 @@
               @edit="editCustomer"
               @delete="deleteCustomer"
               @retry="retryLoad"
+              @bulk-create="showBulkCreateForm"
             />
           </div>
           
-          <!-- 顧客詳細・フォーム -->
-          <div v-if="showForm || selectedCustomer" class="detail-section">
-            <div v-if="showForm" class="form-container">
+          <!-- 顧客詳細・フォーム・一括登録 -->
+          <div v-if="showForm || selectedCustomer || showBulkCreate" class="detail-section">
+            <div v-if="showBulkCreate" class="form-container">
+              <CustomerBulkCreate
+                :is-loading="isSubmitting"
+                @submit="handleBulkSubmit"
+                @cancel="closeBulkCreateForm"
+              />
+            </div>
+            
+            <div v-else-if="showForm" class="form-container">
               <CustomerForm
                 :customer="editingCustomer"
                 :is-submitting="isSubmitting"
@@ -104,11 +113,13 @@ import { ref, onMounted } from 'vue'
 import { useCustomersStore } from '../stores/customers'
 import CustomerList from '../components/CustomerList.vue'
 import CustomerForm from '../components/CustomerForm.vue'
+import CustomerBulkCreate from '../components/CustomerBulkCreate.vue'
 
 const customersStore = useCustomersStore()
 
 // State
 const showForm = ref(false)
+const showBulkCreate = ref(false)
 const selectedCustomer = ref(null)
 const editingCustomer = ref(null)
 const isSubmitting = ref(false)
@@ -128,6 +139,7 @@ const showCreateForm = () => {
   editingCustomer.value = null
   selectedCustomer.value = null
   showForm.value = true
+  showBulkCreate.value = false
 }
 
 const closeForm = () => {
@@ -135,9 +147,20 @@ const closeForm = () => {
   editingCustomer.value = null
 }
 
+const showBulkCreateForm = () => {
+  showForm.value = false
+  showBulkCreate.value = true
+  selectedCustomer.value = null
+}
+
+const closeBulkCreateForm = () => {
+  showBulkCreate.value = false
+}
+
 const selectCustomer = (customer) => {
   selectedCustomer.value = customer
   showForm.value = false
+  showBulkCreate.value = false
 }
 
 const closeDetail = () => {
@@ -148,6 +171,7 @@ const editCustomer = (customer) => {
   editingCustomer.value = customer
   selectedCustomer.value = null
   showForm.value = true
+  showBulkCreate.value = false
 }
 
 const editSelectedCustomer = () => {
@@ -155,6 +179,7 @@ const editSelectedCustomer = () => {
     editingCustomer.value = selectedCustomer.value
     selectedCustomer.value = null
     showForm.value = true
+    showBulkCreate.value = false
   }
 }
 
@@ -196,6 +221,22 @@ const handleFormSubmit = async (customerData) => {
     
   } catch (err) {
     console.error('Failed to submit customer:', err)
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const handleBulkSubmit = async (customersData) => {
+  try {
+    isSubmitting.value = true
+    
+    await customersStore.bulkCreateCustomers(customersData)
+    showSuccessMessage(`${customersData.length}件の顧客を一括登録しました`)
+    
+    closeBulkCreateForm()
+    
+  } catch (err) {
+    console.error('Failed to bulk submit customers:', err)
   } finally {
     isSubmitting.value = false
   }

@@ -125,6 +125,81 @@ export const useCustomersStore = defineStore('customers', () => {
       isLoading.value = false
     }
   }
+
+  const bulkCreateCustomers = async (customersData) => {
+    try {
+      isLoading.value = true
+      error.value = null
+      
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+      
+      if (!Array.isArray(customersData) || customersData.length === 0) {
+        throw new Error('顧客データが正しくありません')
+      }
+      
+      // バリデーション
+      const validationErrors = []
+      customersData.forEach((customerData, index) => {
+        if (!customerData.name || customerData.name.trim() === '') {
+          validationErrors.push(`顧客${index + 1}: 顧客名は必須です`)
+        }
+      })
+      
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join('\n'))
+      }
+      
+      // アプリフォルダの取得（認証ストアから）
+      const appFolder = await authStore.getAppFolderId()
+      
+      // 顧客フォルダの取得または作成
+      const customersFolder = await getOrCreateFolder(token, appFolder.id, CUSTOMERS_FOLDER)
+      
+      // 各顧客を作成
+      const createdCustomers = []
+      for (const customerData of customersData) {
+        try {
+          // 顧客IDの生成
+          const customerId = `cus_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          
+          // 顧客データの作成
+          const newCustomer = {
+            id: customerId,
+            name: customerData.name.trim(),
+            alias: customerData.alias?.trim() || '',
+            address: customerData.address?.trim() || '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+          
+          // 顧客ファイルを作成
+          await createFile(token, customersFolder.id, `${customerId}.json`, newCustomer)
+          
+          // ローカル状態を更新
+          customers.value.push(newCustomer)
+          createdCustomers.push(newCustomer)
+          
+        } catch (err) {
+          console.error(`Failed to create customer ${customerData.name}:`, err)
+          throw new Error(`顧客「${customerData.name}」の作成に失敗しました: ${err.message}`)
+        }
+      }
+      
+      return createdCustomers
+      
+    } catch (err) {
+      console.error('Failed to bulk create customers:', err)
+      error.value = err.message || '顧客の一括作成に失敗しました'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
   
   const updateCustomer = async (customerId, customerData) => {
     try {
@@ -449,6 +524,7 @@ export const useCustomersStore = defineStore('customers', () => {
     initializeCustomers,
     loadCustomers,
     createCustomer,
+    bulkCreateCustomers,
     updateCustomer,
     deleteCustomer,
     getCustomerById,

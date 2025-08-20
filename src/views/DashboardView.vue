@@ -36,6 +36,12 @@
               <p>商品情報の登録・編集</p>
             </router-link>
             
+            <router-link to="/taxes" class="action-card">
+              <div class="action-icon">📊</div>
+              <h4>税率管理</h4>
+              <p>税率の設定・管理</p>
+            </router-link>
+            
             <router-link to="/sales" class="action-card">
               <div class="action-icon">💰</div>
               <h4>売上登録</h4>
@@ -66,6 +72,9 @@
             <div class="info-item">
               <strong>顧客数:</strong> {{ customersStore.customersCount }}件
             </div>
+            <div class="info-item">
+              <strong>税率数:</strong> {{ taxesStore.taxesCount }}件
+            </div>
           </div>
         </div>
       </div>
@@ -77,18 +86,23 @@
 import { onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useCustomersStore } from '../stores/customers'
+import { useTaxesStore } from '../stores/taxes'
 import { useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
 const customersStore = useCustomersStore()
+const taxesStore = useTaxesStore()
 const router = useRouter()
 
 onMounted(async () => {
-  // 顧客データを初期化
+  // 顧客データと税率データを初期化
   try {
-    await customersStore.initializeCustomers()
+    await Promise.all([
+      customersStore.initializeCustomers(),
+      taxesStore.initializeTaxes()
+    ])
   } catch (err) {
-    console.error('Failed to initialize customers:', err)
+    console.error('Failed to initialize data:', err)
   }
 })
 

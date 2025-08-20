@@ -13,10 +13,31 @@
     
     <main class="main">
       <div class="container">
-        <div class="card">
-          <h2>税率一覧</h2>
-          <p>この機能は現在開発中です。</p>
-          <p>Google Drive APIとの連携により、税率情報の管理が可能になります。</p>
+        <div class="content-wrapper">
+          <!-- 税率一覧 -->
+          <div class="content-section">
+            <TaxList
+              :taxes="taxesStore.sortedTaxes"
+              :is-loading="taxesStore.isLoading"
+              :error="taxesStore.error"
+              @add="showForm = true"
+              @edit="handleEdit"
+              @delete="handleDelete"
+              @retry="handleRetry"
+            />
+          </div>
+          
+          <!-- 税率フォーム（モーダル） -->
+          <div v-if="showForm" class="modal-overlay" @click="closeForm">
+            <div class="modal-content" @click.stop>
+              <TaxForm
+                :tax="editingTax"
+                :is-loading="taxesStore.isLoading"
+                @submit="handleSubmit"
+                @close="closeForm"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -24,7 +45,67 @@
 </template>
 
 <script setup>
-// 税率管理機能は後で実装
+import { ref, onMounted } from 'vue'
+import { useTaxesStore } from '../stores/taxes'
+import TaxList from '../components/TaxList.vue'
+import TaxForm from '../components/TaxForm.vue'
+
+const taxesStore = useTaxesStore()
+
+// State
+const showForm = ref(false)
+const editingTax = ref(null)
+
+// 初期化
+onMounted(async () => {
+  try {
+    await taxesStore.initializeTaxes()
+  } catch (err) {
+    console.error('Failed to initialize taxes:', err)
+  }
+})
+
+// イベントハンドラー
+const handleEdit = (tax) => {
+  editingTax.value = tax
+  showForm.value = true
+}
+
+const handleDelete = async (taxId) => {
+  try {
+    await taxesStore.deleteTax(taxId)
+  } catch (err) {
+    console.error('Failed to delete tax:', err)
+  }
+}
+
+const handleSubmit = async (taxData) => {
+  try {
+    if (editingTax.value) {
+      // 編集
+      await taxesStore.updateTax(editingTax.value.id, taxData)
+    } else {
+      // 新規作成
+      await taxesStore.createTax(taxData)
+    }
+    closeForm()
+  } catch (err) {
+    console.error('Failed to submit tax:', err)
+  }
+}
+
+const handleRetry = async () => {
+  try {
+    await taxesStore.initializeTaxes()
+  } catch (err) {
+    console.error('Failed to retry:', err)
+  }
+}
+
+const closeForm = () => {
+  showForm.value = false
+  editingTax.value = null
+}
 </script>
 
 <style scoped>
@@ -55,13 +136,78 @@
   padding: 2rem 0;
 }
 
-.card h2 {
-  color: #333;
-  margin-bottom: 1rem;
+.content-wrapper {
+  position: relative;
 }
 
-.card p {
-  color: #666;
-  margin-bottom: 0.5rem;
+.content-section {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-secondary {
+  background: #f8f9fa;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.btn-secondary:hover {
+  background: #e9ecef;
+}
+
+/* モーダルスタイル */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .content-section {
+    padding: 1rem;
+  }
+  
+  .modal-content {
+    margin: 1rem;
+  }
 }
 </style> 

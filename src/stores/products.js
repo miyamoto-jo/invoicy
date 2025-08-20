@@ -1,0 +1,552 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { useAuthStore } from './auth'
+
+export const useProductsStore = defineStore('products', () => {
+  // State
+  const products = ref([])
+  const isLoading = ref(false)
+  const error = ref(null)
+  const selectedProduct = ref(null)
+  
+  // Computed
+  const productsCount = computed(() => products.value.length)
+  const sortedProducts = computed(() => {
+    return [...products.value].sort((a, b) => {
+      return a.name.localeCompare(b.name, 'ja')
+    })
+  })
+  
+  // Google Drive API設定
+  const PRODUCTS_FOLDER = 'masters/products'
+  
+  // Actions
+  const initializeProducts = async () => {
+    try {
+      isLoading.value = true
+      error.value = null
+      await loadProducts()
+    } catch (err) {
+      console.error('Failed to initialize products:', err)
+      error.value = '商品データの初期化に失敗しました'
+    } finally {
+      isLoading.value = false
+    }
+  }
+  
+  const loadProducts = async () => {
+    try {
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+      
+      // アプリフォルダの取得（認証ストアから）
+      const appFolder = await authStore.getAppFolderId()
+      
+      // 商品フォルダの取得または作成
+      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
+      
+      // 商品ファイルの一覧を取得
+      const files = await listFiles(token, productsFolder.id)
+      
+      // 各ファイルの内容を取得
+      const productsData = []
+      for (const file of files) {
+        try {
+          const content = await getFileContent(token, file.id)
+          if (content) {
+            productsData.push(content)
+          }
+        } catch (err) {
+          console.error(`Failed to load product file ${file.name}:`, err)
+        }
+      }
+      
+      products.value = productsData
+      
+    } catch (err) {
+      console.error('Failed to load products:', err)
+      throw err
+    }
+  }
+  
+  const createProduct = async (productData) => {
+    try {
+      isLoading.value = true
+      error.value = null
+      
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+      
+      // バリデーション
+      if (!productData.name || productData.name.trim() === '') {
+        throw new Error('商品名は必須です')
+      }
+      
+      if (!productData.price || isNaN(productData.price) || productData.price < 0) {
+        throw new Error('税抜金額は0以上の数値を入力してください')
+      }
+      
+      // 商品IDの生成
+      const productId = `prd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
+      // 商品データの作成
+      const newProduct = {
+        id: productId,
+        name: productData.name.trim(),
+        alias: productData.alias?.trim() || '',
+        price: Number(productData.price),
+        customerId: productData.customerId || null, // 使用顧客（任意）
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      
+      // アプリフォルダの取得（認証ストアから）
+      const appFolder = await authStore.getAppFolderId()
+      
+      // 商品フォルダの取得または作成
+      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
+      
+      // 商品ファイルを作成
+      await createFile(token, productsFolder.id, `${productId}.json`, newProduct)
+      
+      // ローカル状態を更新
+      products.value.push(newProduct)
+      
+      return newProduct
+      
+    } catch (err) {
+      console.error('Failed to create product:', err)
+      error.value = err.message || '商品の作成に失敗しました'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const bulkCreateProducts = async (productsData) => {
+    try {
+      isLoading.value = true
+      error.value = null
+      
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+      
+      if (!Array.isArray(productsData) || productsData.length === 0) {
+        throw new Error('商品データが正しくありません')
+      }
+      
+      // バリデーション
+      const validationErrors = []
+      productsData.forEach((productData, index) => {
+        if (!productData.name || productData.name.trim() === '') {
+          validationErrors.push(`商品${index + 1}: 商品名は必須です`)
+        }
+        
+        if (!productData.price || isNaN(productData.price) || Number(productData.price) < 0) {
+          validationErrors.push(`商品${index + 1}: 税抜金額は0以上の数値を入力してください`)
+        }
+      })
+      
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join('\n'))
+      }
+      
+      // アプリフォルダの取得（認証ストアから）
+      const appFolder = await authStore.getAppFolderId()
+      
+      // 商品フォルダの取得または作成
+      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
+      
+      // 各商品を作成
+      const createdProducts = []
+      for (const productData of productsData) {
+        try {
+          // 商品IDの生成
+          const productId = `prd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          
+          // 商品データの作成
+          const newProduct = {
+            id: productId,
+            name: productData.name.trim(),
+            alias: productData.alias?.trim() || '',
+            price: Number(productData.price),
+            customerId: productData.customerId || null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+          
+          // 商品ファイルを作成
+          await createFile(token, productsFolder.id, `${productId}.json`, newProduct)
+          
+          // ローカル状態を更新
+          products.value.push(newProduct)
+          createdProducts.push(newProduct)
+          
+        } catch (err) {
+          console.error(`Failed to create product ${productData.name}:`, err)
+          throw new Error(`商品「${productData.name}」の作成に失敗しました: ${err.message}`)
+        }
+      }
+      
+      return createdProducts
+      
+    } catch (err) {
+      console.error('Failed to bulk create products:', err)
+      error.value = err.message || '商品の一括作成に失敗しました'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+  
+  const updateProduct = async (productId, productData) => {
+    try {
+      isLoading.value = true
+      error.value = null
+      
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+      
+      // バリデーション
+      if (!productData.name || productData.name.trim() === '') {
+        throw new Error('商品名は必須です')
+      }
+      
+      if (!productData.price || isNaN(productData.price) || productData.price < 0) {
+        throw new Error('税抜金額は0以上の数値を入力してください')
+      }
+      
+      // 既存の商品を検索
+      const existingProduct = products.value.find(p => p.id === productId)
+      if (!existingProduct) {
+        throw new Error('商品が見つかりません')
+      }
+      
+      // 商品データの更新
+      const updatedProduct = {
+        ...existingProduct,
+        name: productData.name.trim(),
+        alias: productData.alias?.trim() || '',
+        price: Number(productData.price),
+        customerId: productData.customerId || null, // 使用顧客（任意）
+        updatedAt: new Date().toISOString()
+      }
+      
+      // アプリフォルダの取得（認証ストアから）
+      const appFolder = await authStore.getAppFolderId()
+      
+      // 商品フォルダの取得または作成
+      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
+      
+      // 商品ファイルを検索
+      const files = await listFiles(token, productsFolder.id)
+      const productFile = files.find(f => f.name === `${productId}.json`)
+      
+      if (!productFile) {
+        throw new Error('商品ファイルが見つかりません')
+      }
+      
+      // 商品ファイルを更新
+      await updateFile(token, productFile.id, updatedProduct)
+      
+      // ローカル状態を更新
+      const index = products.value.findIndex(p => p.id === productId)
+      if (index !== -1) {
+        products.value[index] = updatedProduct
+      }
+      
+      return updatedProduct
+      
+    } catch (err) {
+      console.error('Failed to update product:', err)
+      error.value = err.message || '商品の更新に失敗しました'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+  
+  const deleteProduct = async (productId) => {
+    try {
+      isLoading.value = true
+      error.value = null
+      
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+      
+      // 既存の商品を検索
+      const existingProduct = products.value.find(p => p.id === productId)
+      if (!existingProduct) {
+        throw new Error('商品が見つかりません')
+      }
+      
+      // アプリフォルダの取得（認証ストアから）
+      const appFolder = await authStore.getAppFolderId()
+      
+      // 商品フォルダの取得または作成
+      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
+      
+      // 商品ファイルを検索
+      const files = await listFiles(token, productsFolder.id)
+      const productFile = files.find(f => f.name === `${productId}.json`)
+      
+      if (!productFile) {
+        throw new Error('商品ファイルが見つかりません')
+      }
+      
+      // 商品ファイルを削除
+      await deleteFile(token, productFile.id)
+      
+      // ローカル状態を更新
+      const index = products.value.findIndex(p => p.id === productId)
+      if (index !== -1) {
+        products.value.splice(index, 1)
+      }
+      
+    } catch (err) {
+      console.error('Failed to delete product:', err)
+      error.value = err.message || '商品の削除に失敗しました'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+  
+  const getProductById = (productId) => {
+    return products.value.find(p => p.id === productId)
+  }
+  
+  const searchProducts = (query) => {
+    if (!query || query.trim() === '') {
+      return sortedProducts.value
+    }
+    
+    const searchTerm = query.toLowerCase()
+    return sortedProducts.value.filter(product => 
+      product.name.toLowerCase().includes(searchTerm) ||
+      product.alias.toLowerCase().includes(searchTerm)
+    )
+  }
+  
+  const getProductsByCustomer = (customerId) => {
+    return products.value.filter(product => product.customerId === customerId)
+  }
+  
+  // Google Drive API ヘルパー関数
+  const getOrCreateFolder = async (token, parentId, folderName) => {
+    try {
+      // フォルダを検索
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      )
+      
+      if (!response.ok) {
+        throw new Error('フォルダの検索に失敗しました')
+      }
+      
+      const data = await response.json()
+      
+      if (data.files && data.files.length > 0) {
+        return data.files[0]
+      }
+      
+      // フォルダを作成
+      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: folderName,
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: [parentId]
+        })
+      })
+      
+      if (!createResponse.ok) {
+        throw new Error('フォルダの作成に失敗しました')
+      }
+      
+      return await createResponse.json()
+      
+    } catch (err) {
+      console.error('Failed to get or create folder:', err)
+      throw err
+    }
+  }
+  
+  const listFiles = async (token, folderId) => {
+    try {
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q='${folderId}' in parents and trashed=false`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      )
+      
+      if (!response.ok) {
+        throw new Error('ファイル一覧の取得に失敗しました')
+      }
+      
+      const data = await response.json()
+      return data.files || []
+      
+    } catch (err) {
+      console.error('Failed to list files:', err)
+      throw err
+    }
+  }
+  
+  const createFile = async (token, folderId, fileName, content) => {
+    try {
+      const response = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: fileName,
+          parents: [folderId]
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('ファイルの作成に失敗しました')
+      }
+      
+      const file = await response.json()
+      
+      // ファイルの内容を更新
+      await updateFileContent(token, file.id, content)
+      
+      return file
+      
+    } catch (err) {
+      console.error('Failed to create file:', err)
+      throw err
+    }
+  }
+  
+  const updateFile = async (token, fileId, content) => {
+    try {
+      await updateFileContent(token, fileId, content)
+    } catch (err) {
+      console.error('Failed to update file:', err)
+      throw err
+    }
+  }
+  
+  const updateFileContent = async (token, fileId, content) => {
+    try {
+      const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(content)
+      })
+      
+      if (!response.ok) {
+        throw new Error('ファイル内容の更新に失敗しました')
+      }
+      
+      return await response.json()
+      
+    } catch (err) {
+      console.error('Failed to update file content:', err)
+      throw err
+    }
+  }
+  
+  const getFileContent = async (token, fileId) => {
+    try {
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('ファイル内容の取得に失敗しました')
+      }
+      
+      return await response.json()
+      
+    } catch (err) {
+      console.error('Failed to get file content:', err)
+      throw err
+    }
+  }
+  
+  const deleteFile = async (token, fileId) => {
+    try {
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('ファイルの削除に失敗しました')
+      }
+      
+    } catch (err) {
+      console.error('Failed to delete file:', err)
+      throw err
+    }
+  }
+  
+  return {
+    // State
+    products,
+    isLoading,
+    error,
+    selectedProduct,
+    
+    // Computed
+    productsCount,
+    sortedProducts,
+    
+    // Actions
+    initializeProducts,
+    loadProducts,
+    createProduct,
+    bulkCreateProducts,
+    updateProduct,
+    deleteProduct,
+    getProductById,
+    searchProducts,
+    getProductsByCustomer
+  }
+}) 

@@ -35,16 +35,16 @@
 
 - ルート：`/Invoicy/`（初回起動時に存在確認→なければ作成）
   - `masters/`
-    - `customers/` … 顧客 1 件 = 1 ファイル（`{customerId}.json`）
-    - `products/`  … 商品 1 件 = 1 ファイル（`{productId}.json`）
-    - `taxes/`     … 税率 1 件 = 1 ファイル（`{taxId}.json`）
-    - `settings/`  … 設定 1 件 = 1 ファイル（`settings.json`）
+    - `customers.json` … 顧客マスター（全顧客データを1ファイルで管理）
+    - `products.json`  … 商品マスター（全商品データを1ファイルで管理）
+    - `taxes.json`     … 税率マスター（全税率データを1ファイルで管理）
+    - `settings.json`  … 設定（アプリ設定を1ファイルで管理）
   - `sales/`
     - 伝票（売上）1 件 = 1 ファイル（`{YYYYMMDD}_{customerId}_{ticketId}.json`）
   - `invoices/`
     - `YYYY-MM/` … 請求書 1 件 = 1 ファイル（`{customerId}_{invoiceId}.json`）
 
-> 単一ユーザー運用を想定し、**衝突回避のためレコード単位ファイル**方式を採用。検索は親フォルダ + ファイル名/プロパティで実行。
+> 単一ユーザー運用を想定し、**マスターデータは1ファイルで管理**、**伝票・請求書はレコード単位ファイル**方式を採用。マスター検索はファイル全体を取得してクライアント側でフィルタ。
 
 ### 3.2 ファイル命名・ID
 
@@ -54,40 +54,56 @@
 
 ### 3.3 JSON スキーマ（最小）
 
-**顧客（customers/{id}.json）**
+**顧客マスター（masters/customers.json）**
 
 ```json
 {
-  "id": "cus_...",
-  "name": "顧客名称",
-  "alias": "顧客管理用名称",
-  "address": "住所",
-  "createdAt": "2025-08-16T12:34:56+09:00",
-  "updatedAt": "2025-08-16T12:34:56+09:00"
+  "customers": [
+    {
+      "id": "cus_...",
+      "name": "顧客名称",
+      "alias": "顧客管理用名称",
+      "address": "住所",
+      "createdAt": "2025-08-16T12:34:56+09:00",
+      "updatedAt": "2025-08-16T12:34:56+09:00"
+    }
+  ],
+  "lastUpdated": "2025-08-16T12:34:56+09:00"
 }
 ```
 
-**商品（products/{id}.json）**
+**商品マスター（masters/products.json）**
 
 ```json
 {
-  "id": "prd_...",
-  "name": "商品名称",
-  "alias": "商品管理用名称",
-  "priceExclTax": 250,   
-  "usedByCustomerIds": ["cus_..."] ,
-  "createdAt": "...",
-  "updatedAt": "..."
+  "products": [
+    {
+      "id": "prd_...",
+      "name": "商品名称",
+      "alias": "商品管理用名称",
+      "priceExclTax": 250,   
+      "usedByCustomerIds": ["cus_..."],
+      "createdAt": "2025-08-16T12:34:56+09:00",
+      "updatedAt": "2025-08-16T12:34:56+09:00"
+    }
+  ],
+  "lastUpdated": "2025-08-16T12:34:56+09:00"
 }
 ```
 
-**税率（taxes/{id}.json）**
+**税率マスター（masters/taxes.json）**
 
 ```json
-{ "id": "tax_10", "rate": 10, "createdAt": "..." }
+{
+  "taxes": [
+    { "id": "tax_10", "rate": 10, "createdAt": "2025-08-16T12:34:56+09:00" },
+    { "id": "tax_8", "rate": 8, "createdAt": "2025-08-16T12:34:56+09:00" }
+  ],
+  "lastUpdated": "2025-08-16T12:34:56+09:00"
+}
 ```
 
-**設定（masters/settings/settings.json）**
+**設定（masters/settings.json）**
 
 ```json
 { "rounding": "floor", "defaultTaxRate": 10 }
@@ -138,10 +154,10 @@
 ### 4.1 マスター CRUD
 
 1. UI 入力 → バリデーション（必須、型、範囲）
-2. Drive 上の対象フォルダを取得（なければ作成）
-3. 新規：JSON を `files.create`（親=フォルダ ID）
-4. 更新：`files.update`（対象ファイル ID 指定）
-5. 削除：`files.update` で `trashed=true`（論理削除）
+2. Drive 上の対象マスターファイルを取得（なければ作成）
+3. 新規：配列に追加 → ファイル全体を `files.update` で更新
+4. 更新：配列内の該当レコードを更新 → ファイル全体を `files.update` で更新
+5. 削除：配列から該当レコードを削除 → ファイル全体を `files.update` で更新
 
 ### 4.2 売上登録（伝票作成）
 

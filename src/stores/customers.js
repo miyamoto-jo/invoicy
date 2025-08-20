@@ -18,7 +18,7 @@ export const useCustomersStore = defineStore('customers', () => {
   })
   
   // Google Drive API設定
-  const CUSTOMERS_FOLDER = 'masters/customers'
+  const CUSTOMERS_FILE = 'masters/customers.json'
   
   // Actions
   const initializeCustomers = async () => {
@@ -46,26 +46,17 @@ export const useCustomersStore = defineStore('customers', () => {
       // アプリフォルダの取得（認証ストアから）
       const appFolder = await authStore.getAppFolderId()
       
-      // 顧客フォルダの取得または作成
-      const customersFolder = await getOrCreateFolder(token, appFolder.id, CUSTOMERS_FOLDER)
+      // 顧客ファイルの取得または作成
+      const customersFile = await getOrCreateCustomersFile(token, appFolder.id)
       
-      // 顧客ファイルの一覧を取得
-      const files = await listFiles(token, customersFolder.id)
+      // ファイルの内容を取得
+      const content = await getFileContent(token, customersFile.id)
       
-      // 各ファイルの内容を取得
-      const customersData = []
-      for (const file of files) {
-        try {
-          const content = await getFileContent(token, file.id)
-          if (content) {
-            customersData.push(content)
-          }
-        } catch (err) {
-          console.error(`Failed to load customer file ${file.name}:`, err)
-        }
+      if (content && Array.isArray(content)) {
+        customers.value = content
+      } else {
+        customers.value = []
       }
-      
-      customers.value = customersData
       
     } catch (err) {
       console.error('Failed to load customers:', err)
@@ -103,17 +94,11 @@ export const useCustomersStore = defineStore('customers', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // アプリフォルダの取得（認証ストアから）
-      const appFolder = await authStore.getAppFolderId()
-      
-      // 顧客フォルダの取得または作成
-      const customersFolder = await getOrCreateFolder(token, appFolder.id, CUSTOMERS_FOLDER)
-      
-      // 顧客ファイルを作成
-      await createFile(token, customersFolder.id, `${customerId}.json`, newCustomer)
-      
       // ローカル状態を更新
       customers.value.push(newCustomer)
+      
+      // ファイルを更新
+      await saveCustomersToFile(token)
       
       return newCustomer
       
@@ -154,12 +139,6 @@ export const useCustomersStore = defineStore('customers', () => {
         throw new Error(validationErrors.join('\n'))
       }
       
-      // アプリフォルダの取得（認証ストアから）
-      const appFolder = await authStore.getAppFolderId()
-      
-      // 顧客フォルダの取得または作成
-      const customersFolder = await getOrCreateFolder(token, appFolder.id, CUSTOMERS_FOLDER)
-      
       // 各顧客を作成
       const createdCustomers = []
       for (const customerData of customersData) {
@@ -177,9 +156,6 @@ export const useCustomersStore = defineStore('customers', () => {
             updatedAt: new Date().toISOString()
           }
           
-          // 顧客ファイルを作成
-          await createFile(token, customersFolder.id, `${customerId}.json`, newCustomer)
-          
           // ローカル状態を更新
           customers.value.push(newCustomer)
           createdCustomers.push(newCustomer)
@@ -189,6 +165,9 @@ export const useCustomersStore = defineStore('customers', () => {
           throw new Error(`顧客「${customerData.name}」の作成に失敗しました: ${err.message}`)
         }
       }
+      
+      // ファイルを更新
+      await saveCustomersToFile(token)
       
       return createdCustomers
       
@@ -233,28 +212,14 @@ export const useCustomersStore = defineStore('customers', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // アプリフォルダの取得（認証ストアから）
-      const appFolder = await authStore.getAppFolderId()
-      
-      // 顧客フォルダの取得または作成
-      const customersFolder = await getOrCreateFolder(token, appFolder.id, CUSTOMERS_FOLDER)
-      
-      // 顧客ファイルを検索
-      const files = await listFiles(token, customersFolder.id)
-      const customerFile = files.find(f => f.name === `${customerId}.json`)
-      
-      if (!customerFile) {
-        throw new Error('顧客ファイルが見つかりません')
-      }
-      
-      // 顧客ファイルを更新
-      await updateFile(token, customerFile.id, updatedCustomer)
-      
       // ローカル状態を更新
       const index = customers.value.findIndex(c => c.id === customerId)
       if (index !== -1) {
         customers.value[index] = updatedCustomer
       }
+      
+      // ファイルを更新
+      await saveCustomersToFile(token)
       
       return updatedCustomer
       
@@ -285,28 +250,14 @@ export const useCustomersStore = defineStore('customers', () => {
         throw new Error('顧客が見つかりません')
       }
       
-      // アプリフォルダの取得（認証ストアから）
-      const appFolder = await authStore.getAppFolderId()
-      
-      // 顧客フォルダの取得または作成
-      const customersFolder = await getOrCreateFolder(token, appFolder.id, CUSTOMERS_FOLDER)
-      
-      // 顧客ファイルを検索
-      const files = await listFiles(token, customersFolder.id)
-      const customerFile = files.find(f => f.name === `${customerId}.json`)
-      
-      if (!customerFile) {
-        throw new Error('顧客ファイルが見つかりません')
-      }
-      
-      // 顧客ファイルを削除（論理削除）
-      await deleteFile(token, customerFile.id)
-      
       // ローカル状態を更新
       const index = customers.value.findIndex(c => c.id === customerId)
       if (index !== -1) {
         customers.value.splice(index, 1)
       }
+      
+      // ファイルを更新
+      await saveCustomersToFile(token)
       
     } catch (err) {
       console.error('Failed to delete customer:', err)
@@ -335,6 +286,76 @@ export const useCustomersStore = defineStore('customers', () => {
   }
   
   // Google Drive API ヘルパー関数
+  const getOrCreateCustomersFile = async (token, appFolderId) => {
+    try {
+      // mastersフォルダの取得または作成
+      const mastersFolder = await getOrCreateFolder(token, appFolderId, 'masters')
+      
+      // customers.jsonファイルを検索
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='customers.json' and '${mastersFolder.id}' in parents and trashed=false`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      )
+      
+      if (!response.ok) {
+        throw new Error('ファイルの検索に失敗しました')
+      }
+      
+      const data = await response.json()
+      
+      if (data.files && data.files.length > 0) {
+        return data.files[0]
+      }
+      
+      // customers.jsonファイルを作成
+      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'customers.json',
+          parents: [mastersFolder.id]
+        })
+      })
+      
+      if (!createResponse.ok) {
+        throw new Error('ファイルの作成に失敗しました')
+      }
+      
+      const file = await createResponse.json()
+      
+      // 初期データ（空の配列）を設定
+      await updateFileContent(token, file.id, [])
+      
+      return file
+      
+    } catch (err) {
+      console.error('Failed to get or create customers file:', err)
+      throw err
+    }
+  }
+  
+  const saveCustomersToFile = async (token) => {
+    try {
+      const authStore = useAuthStore()
+      const appFolder = await authStore.getAppFolderId()
+      const customersFile = await getOrCreateCustomersFile(token, appFolder.id)
+      
+      // ファイルの内容を更新
+      await updateFileContent(token, customersFile.id, customers.value)
+      
+    } catch (err) {
+      console.error('Failed to save customers to file:', err)
+      throw err
+    }
+  }
+  
   const getOrCreateFolder = async (token, parentId, folderName) => {
     try {
       // フォルダを検索
@@ -383,70 +404,6 @@ export const useCustomersStore = defineStore('customers', () => {
     }
   }
   
-  const listFiles = async (token, folderId) => {
-    try {
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q='${folderId}' in parents and trashed=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
-      
-      if (!response.ok) {
-        throw new Error('ファイル一覧の取得に失敗しました')
-      }
-      
-      const data = await response.json()
-      return data.files || []
-      
-    } catch (err) {
-      console.error('Failed to list files:', err)
-      throw err
-    }
-  }
-  
-  const createFile = async (token, folderId, fileName, content) => {
-    try {
-      const response = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: fileName,
-          parents: [folderId]
-        })
-      })
-      
-      if (!response.ok) {
-        throw new Error('ファイルの作成に失敗しました')
-      }
-      
-      const file = await response.json()
-      
-      // ファイルの内容を更新
-      await updateFileContent(token, file.id, content)
-      
-      return file
-      
-    } catch (err) {
-      console.error('Failed to create file:', err)
-      throw err
-    }
-  }
-  
-  const updateFile = async (token, fileId, content) => {
-    try {
-      await updateFileContent(token, fileId, content)
-    } catch (err) {
-      console.error('Failed to update file:', err)
-      throw err
-    }
-  }
-  
   const updateFileContent = async (token, fileId, content) => {
     try {
       const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
@@ -486,25 +443,6 @@ export const useCustomersStore = defineStore('customers', () => {
       
     } catch (err) {
       console.error('Failed to get file content:', err)
-      throw err
-    }
-  }
-  
-  const deleteFile = async (token, fileId) => {
-    try {
-      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error('ファイルの削除に失敗しました')
-      }
-      
-    } catch (err) {
-      console.error('Failed to delete file:', err)
       throw err
     }
   }

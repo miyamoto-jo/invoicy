@@ -18,7 +18,7 @@ export const useProductsStore = defineStore('products', () => {
   })
   
   // Google Drive API設定
-  const PRODUCTS_FOLDER = 'masters/products'
+  const PRODUCTS_FILE = 'masters/products.json'
   
   // Actions
   const initializeProducts = async () => {
@@ -46,26 +46,17 @@ export const useProductsStore = defineStore('products', () => {
       // アプリフォルダの取得（認証ストアから）
       const appFolder = await authStore.getAppFolderId()
       
-      // 商品フォルダの取得または作成
-      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
+      // 商品ファイルの取得または作成
+      const productsFile = await getOrCreateProductsFile(token, appFolder.id)
       
-      // 商品ファイルの一覧を取得
-      const files = await listFiles(token, productsFolder.id)
+      // ファイルの内容を取得
+      const content = await getFileContent(token, productsFile.id)
       
-      // 各ファイルの内容を取得
-      const productsData = []
-      for (const file of files) {
-        try {
-          const content = await getFileContent(token, file.id)
-          if (content) {
-            productsData.push(content)
-          }
-        } catch (err) {
-          console.error(`Failed to load product file ${file.name}:`, err)
-        }
+      if (content && Array.isArray(content)) {
+        products.value = content
+      } else {
+        products.value = []
       }
-      
-      products.value = productsData
       
     } catch (err) {
       console.error('Failed to load products:', err)
@@ -108,17 +99,11 @@ export const useProductsStore = defineStore('products', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // アプリフォルダの取得（認証ストアから）
-      const appFolder = await authStore.getAppFolderId()
-      
-      // 商品フォルダの取得または作成
-      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
-      
-      // 商品ファイルを作成
-      await createFile(token, productsFolder.id, `${productId}.json`, newProduct)
-      
       // ローカル状態を更新
       products.value.push(newProduct)
+      
+      // ファイルを更新
+      await saveProductsToFile(token)
       
       return newProduct
       
@@ -163,12 +148,6 @@ export const useProductsStore = defineStore('products', () => {
         throw new Error(validationErrors.join('\n'))
       }
       
-      // アプリフォルダの取得（認証ストアから）
-      const appFolder = await authStore.getAppFolderId()
-      
-      // 商品フォルダの取得または作成
-      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
-      
       // 各商品を作成
       const createdProducts = []
       for (const productData of productsData) {
@@ -187,9 +166,6 @@ export const useProductsStore = defineStore('products', () => {
             updatedAt: new Date().toISOString()
           }
           
-          // 商品ファイルを作成
-          await createFile(token, productsFolder.id, `${productId}.json`, newProduct)
-          
           // ローカル状態を更新
           products.value.push(newProduct)
           createdProducts.push(newProduct)
@@ -199,6 +175,9 @@ export const useProductsStore = defineStore('products', () => {
           throw new Error(`商品「${productData.name}」の作成に失敗しました: ${err.message}`)
         }
       }
+      
+      // ファイルを更新
+      await saveProductsToFile(token)
       
       return createdProducts
       
@@ -248,28 +227,14 @@ export const useProductsStore = defineStore('products', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // アプリフォルダの取得（認証ストアから）
-      const appFolder = await authStore.getAppFolderId()
-      
-      // 商品フォルダの取得または作成
-      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
-      
-      // 商品ファイルを検索
-      const files = await listFiles(token, productsFolder.id)
-      const productFile = files.find(f => f.name === `${productId}.json`)
-      
-      if (!productFile) {
-        throw new Error('商品ファイルが見つかりません')
-      }
-      
-      // 商品ファイルを更新
-      await updateFile(token, productFile.id, updatedProduct)
-      
       // ローカル状態を更新
       const index = products.value.findIndex(p => p.id === productId)
       if (index !== -1) {
         products.value[index] = updatedProduct
       }
+      
+      // ファイルを更新
+      await saveProductsToFile(token)
       
       return updatedProduct
       
@@ -300,28 +265,14 @@ export const useProductsStore = defineStore('products', () => {
         throw new Error('商品が見つかりません')
       }
       
-      // アプリフォルダの取得（認証ストアから）
-      const appFolder = await authStore.getAppFolderId()
-      
-      // 商品フォルダの取得または作成
-      const productsFolder = await getOrCreateFolder(token, appFolder.id, PRODUCTS_FOLDER)
-      
-      // 商品ファイルを検索
-      const files = await listFiles(token, productsFolder.id)
-      const productFile = files.find(f => f.name === `${productId}.json`)
-      
-      if (!productFile) {
-        throw new Error('商品ファイルが見つかりません')
-      }
-      
-      // 商品ファイルを削除
-      await deleteFile(token, productFile.id)
-      
       // ローカル状態を更新
       const index = products.value.findIndex(p => p.id === productId)
       if (index !== -1) {
         products.value.splice(index, 1)
       }
+      
+      // ファイルを更新
+      await saveProductsToFile(token)
       
     } catch (err) {
       console.error('Failed to delete product:', err)
@@ -353,6 +304,76 @@ export const useProductsStore = defineStore('products', () => {
   }
   
   // Google Drive API ヘルパー関数
+  const getOrCreateProductsFile = async (token, appFolderId) => {
+    try {
+      // mastersフォルダの取得または作成
+      const mastersFolder = await getOrCreateFolder(token, appFolderId, 'masters')
+      
+      // products.jsonファイルを検索
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='products.json' and '${mastersFolder.id}' in parents and trashed=false`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      )
+      
+      if (!response.ok) {
+        throw new Error('ファイルの検索に失敗しました')
+      }
+      
+      const data = await response.json()
+      
+      if (data.files && data.files.length > 0) {
+        return data.files[0]
+      }
+      
+      // products.jsonファイルを作成
+      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'products.json',
+          parents: [mastersFolder.id]
+        })
+      })
+      
+      if (!createResponse.ok) {
+        throw new Error('ファイルの作成に失敗しました')
+      }
+      
+      const file = await createResponse.json()
+      
+      // 初期データ（空の配列）を設定
+      await updateFileContent(token, file.id, [])
+      
+      return file
+      
+    } catch (err) {
+      console.error('Failed to get or create products file:', err)
+      throw err
+    }
+  }
+  
+  const saveProductsToFile = async (token) => {
+    try {
+      const authStore = useAuthStore()
+      const appFolder = await authStore.getAppFolderId()
+      const productsFile = await getOrCreateProductsFile(token, appFolder.id)
+      
+      // ファイルの内容を更新
+      await updateFileContent(token, productsFile.id, products.value)
+      
+    } catch (err) {
+      console.error('Failed to save products to file:', err)
+      throw err
+    }
+  }
+  
   const getOrCreateFolder = async (token, parentId, folderName) => {
     try {
       // フォルダを検索
@@ -401,70 +422,6 @@ export const useProductsStore = defineStore('products', () => {
     }
   }
   
-  const listFiles = async (token, folderId) => {
-    try {
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q='${folderId}' in parents and trashed=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
-      
-      if (!response.ok) {
-        throw new Error('ファイル一覧の取得に失敗しました')
-      }
-      
-      const data = await response.json()
-      return data.files || []
-      
-    } catch (err) {
-      console.error('Failed to list files:', err)
-      throw err
-    }
-  }
-  
-  const createFile = async (token, folderId, fileName, content) => {
-    try {
-      const response = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: fileName,
-          parents: [folderId]
-        })
-      })
-      
-      if (!response.ok) {
-        throw new Error('ファイルの作成に失敗しました')
-      }
-      
-      const file = await response.json()
-      
-      // ファイルの内容を更新
-      await updateFileContent(token, file.id, content)
-      
-      return file
-      
-    } catch (err) {
-      console.error('Failed to create file:', err)
-      throw err
-    }
-  }
-  
-  const updateFile = async (token, fileId, content) => {
-    try {
-      await updateFileContent(token, fileId, content)
-    } catch (err) {
-      console.error('Failed to update file:', err)
-      throw err
-    }
-  }
-  
   const updateFileContent = async (token, fileId, content) => {
     try {
       const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
@@ -504,25 +461,6 @@ export const useProductsStore = defineStore('products', () => {
       
     } catch (err) {
       console.error('Failed to get file content:', err)
-      throw err
-    }
-  }
-  
-  const deleteFile = async (token, fileId) => {
-    try {
-      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error('ファイルの削除に失敗しました')
-      }
-      
-    } catch (err) {
-      console.error('Failed to delete file:', err)
       throw err
     }
   }

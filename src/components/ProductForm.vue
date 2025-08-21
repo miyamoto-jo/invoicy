@@ -131,8 +131,8 @@ onMounted(async () => {
   if (props.product) {
     formData.name = props.product.name || ''
     formData.alias = props.product.alias || ''
-    formData.price = props.product.price?.toString() || ''
-    formData.customerId = props.product.customerId || ''
+    formData.price = props.product.priceExclTax?.toString() || ''
+    formData.customerId = props.product.usedByCustomerIds?.[0] || ''
   }
 })
 

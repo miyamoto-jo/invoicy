@@ -18,7 +18,7 @@ export const useCustomersStore = defineStore('customers', () => {
   })
   
   // Google Drive API設定
-  const CUSTOMERS_FILE = 'masters/customers.json'
+  const CUSTOMERS_FILE = 'masters/customers.jsonl'
   
   // Actions
   const initializeCustomers = async () => {
@@ -52,8 +52,20 @@ export const useCustomersStore = defineStore('customers', () => {
       // ファイルの内容を取得
       const content = await getFileContent(token, customersFile.id)
       
-      if (content && Array.isArray(content)) {
-        customers.value = content
+      if (content && typeof content === 'string' && content.trim()) {
+        // JSONL形式の文字列を行ごとにパース
+        const lines = content.trim().split('\n')
+        const parsedCustomers = []
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              parsedCustomers.push(JSON.parse(line))
+            } catch (err) {
+              console.warn('Invalid JSON line in customers.jsonl:', line, err)
+            }
+          }
+        }
+        customers.value = parsedCustomers
       } else {
         customers.value = []
       }
@@ -314,9 +326,9 @@ export const useCustomersStore = defineStore('customers', () => {
       // mastersフォルダの取得または作成
       const mastersFolder = await getOrCreateFolder(token, appFolderId, 'masters')
       
-      // customers.jsonファイルを検索
+      // customers.jsonlファイルを検索
       const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='customers.json' and '${mastersFolder.id}' in parents and trashed=false`,
+        `https://www.googleapis.com/drive/v3/files?q=name='customers.jsonl' and '${mastersFolder.id}' in parents and trashed=false`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -334,7 +346,7 @@ export const useCustomersStore = defineStore('customers', () => {
         return data.files[0]
       }
       
-      // customers.jsonファイルを作成
+      // customers.jsonlファイルを作成
       const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: {
@@ -342,7 +354,7 @@ export const useCustomersStore = defineStore('customers', () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: 'customers.json',
+          name: 'customers.jsonl',
           parents: [mastersFolder.id]
         })
       })
@@ -353,8 +365,8 @@ export const useCustomersStore = defineStore('customers', () => {
       
       const file = await createResponse.json()
       
-      // 初期データ（空の配列）を設定
-      await updateFileContent(token, file.id, [])
+      // 初期データ（空のJSONLファイル）を設定
+      await updateFileContent(token, file.id, '')
       
       return file
       
@@ -370,8 +382,9 @@ export const useCustomersStore = defineStore('customers', () => {
       const appFolder = await authStore.getAppFolderId()
       const customersFile = await getOrCreateCustomersFile(token, appFolder.id)
       
-      // ファイルの内容を更新
-      await updateFileContent(token, customersFile.id, customers.value)
+      // ファイルの内容を更新（JSONL形式）
+      const jsonlContent = customers.value.map(customer => JSON.stringify(customer)).join('\n')
+      await updateFileContent(token, customersFile.id, jsonlContent)
       
     } catch (err) {
       console.error('Failed to save customers to file:', err)

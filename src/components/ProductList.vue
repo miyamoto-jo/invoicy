@@ -71,11 +71,11 @@
             <strong>管理用名称:</strong> {{ product.alias }}
           </div>
           <div class="product-price">
-            <strong>税抜金額:</strong> ¥{{ formatPrice(product.price) }}
+            <strong>税抜金額:</strong> ¥{{ formatPrice(product.priceExclTax) }}
           </div>
-          <div v-if="product.customerId" class="product-customer">
-            <strong>使用顧客:</strong> {{ getCustomerName(product.customerId) }}
-          </div>
+                      <div v-if="product.usedByCustomerIds && product.usedByCustomerIds.length > 0" class="product-customer">
+              <strong>使用顧客:</strong> {{ getCustomerName(product.usedByCustomerIds[0]) }}
+            </div>
           <div class="product-dates">
             <small>作成: {{ formatDate(product.createdAt) }}</small>
             <small>更新: {{ formatDate(product.updatedAt) }}</small>

@@ -36,8 +36,8 @@
 - ルート：`/Invoicy/`（初回起動時に存在確認→なければ作成）
   - `setting.json`  … 設定（事業者設定・アプリ設定を1ファイルで管理）
   - `masters/`
-    - `customers.json` … 顧客マスター（全顧客データを1ファイルで管理）
-    - `products.json`  … 商品マスター（全商品データを1ファイルで管理）
+    - `customers.jsonl` … 顧客マスター（全顧客データを1ファイルで管理）
+    - `products.jsonl`  … 商品マスター（全商品データを1ファイルで管理）
     - `taxes.json`     … 税率マスター（全税率データを1ファイルで管理）
   - `sales/`
     - 伝票（売上）1 件 = 1 ファイル（`{YYYYMMDD}_{customerId}_{ticketId}.json`）
@@ -45,6 +45,12 @@
     - `YYYY-MM/` … 請求書 1 件 = 1 ファイル（`{customerId}_{invoiceId}.json`）
 
 > 単一ユーザー運用を想定し、**マスターデータは1ファイルで管理**、**伝票・請求書はレコード単位ファイル**方式を採用。マスター検索はファイル全体を取得してクライアント側でフィルタ。
+> 
+> **JSONL形式の採用理由**：
+> - 逐次処理しやすい：ダウンロードしながら行ごとにパース＆フィルタできます（メモリ節約・一覧表示が早い）
+> - 追記が楽＆衝突に強い：末尾に1行追加でOK（実際は置換アップロードでも、整形がシンプル）
+> - ツール親和性：jq、BigQuery、各種ログ基盤などが改行区切りJSONを前提にサポート
+> - サイズ差はほぼなし：配列の [ , ] が無い代わりに改行が入るだけ
 
 ### 3.2 ファイル命名・ID
 
@@ -54,43 +60,18 @@
 
 ### 3.3 JSON スキーマ（最小）
 
-**顧客マスター（masters/customers.json）**
+**顧客マスター（masters/customers.jsonl）**
 
-```json
-{
-  "customers": [
-    {
-      "id": "cus_...",
-      "name": "顧客名称",
-      "alias": "顧客管理用名称",
-      "address": "住所",
-      "closingDay": "末日",
-      "paymentMethod": "振込",
-      "createdAt": "2025-08-16T12:34:56+09:00",
-      "updatedAt": "2025-08-16T12:34:56+09:00"
-    }
-  ],
-  "lastUpdated": "2025-08-16T12:34:56+09:00"
-}
+```jsonl
+{"id": "cus_...", "name": "顧客名称", "alias": "顧客管理用名称", "address": "住所", "closingDay": "末日", "paymentMethod": "振込", "createdAt": "2025-08-16T12:34:56+09:00", "updatedAt": "2025-08-16T12:34:56+09:00"}
+{"id": "cus_...", "name": "顧客名称2", "alias": "顧客管理用名称2", "address": "住所2", "closingDay": "末日", "paymentMethod": "振込", "createdAt": "2025-08-16T12:34:56+09:00", "updatedAt": "2025-08-16T12:34:56+09:00"}
 ```
 
-**商品マスター（masters/products.json）**
+**商品マスター（masters/products.jsonl）**
 
-```json
-{
-  "products": [
-    {
-      "id": "prd_...",
-      "name": "商品名称",
-      "alias": "商品管理用名称",
-      "priceExclTax": 250,   
-      "usedByCustomerIds": ["cus_..."],
-      "createdAt": "2025-08-16T12:34:56+09:00",
-      "updatedAt": "2025-08-16T12:34:56+09:00"
-    }
-  ],
-  "lastUpdated": "2025-08-16T12:34:56+09:00"
-}
+```jsonl
+{"id": "prd_...", "name": "商品名称", "alias": "商品管理用名称", "priceExclTax": 250, "usedByCustomerIds": ["cus_..."], "createdAt": "2025-08-16T12:34:56+09:00", "updatedAt": "2025-08-16T12:34:56+09:00"}
+{"id": "prd_...", "name": "商品名称2", "alias": "商品管理用名称2", "priceExclTax": 300, "usedByCustomerIds": ["cus_..."], "createdAt": "2025-08-16T12:34:56+09:00", "updatedAt": "2025-08-16T12:34:56+09:00"}
 ```
 
 **税率マスター（masters/taxes.json）**

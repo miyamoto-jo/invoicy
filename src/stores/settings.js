@@ -25,7 +25,7 @@ export const useSettingsStore = defineStore('settings', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // settings.jsonファイルの存在確認と取得
+      // setting.jsonファイルの存在確認と取得
       await loadSettingsFile(token)
       
     } catch (err) {
@@ -43,8 +43,8 @@ export const useSettingsStore = defineStore('settings', () => {
       const authStore = useAuthStore()
       const appFolder = await authStore.getAppFolderId()
       
-      // settings.jsonファイルを検索
-      const searchQuery = `name='settings.json' and '${appFolder.id}' in parents and trashed=false`
+      // setting.jsonファイルを検索
+      const searchQuery = `name='setting.json' and '${appFolder.id}' in parents and trashed=false`
       const searchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name)`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -120,11 +120,11 @@ export const useSettingsStore = defineStore('settings', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // settings.jsonファイルを作成
+      // setting.jsonファイルを作成
       const appFolder = await authStore.getAppFolderId()
       
       const createPayload = {
-        name: 'settings.json',
+        name: 'setting.json',
         parents: [appFolder.id],
         mimeType: 'application/json'
       }
@@ -193,7 +193,7 @@ export const useSettingsStore = defineStore('settings', () => {
       
       // 既存の設定ファイルを検索
       const appFolder = await authStore.getAppFolderId()
-      const searchQuery = `name='settings.json' and '${appFolder.id}' in parents and trashed=false`
+      const searchQuery = `name='setting.json' and '${appFolder.id}' in parents and trashed=false`
       const searchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name)`, {
         headers: {
           'Authorization': `Bearer ${token}`

@@ -29,9 +29,10 @@
 | **住所** | 事業者の住所 | |
 
 **画面仕様**
-- ログイン後、`settings.json`が存在しない場合は事業者設定作成画面を表示
+- ログイン後、`setting.json`が存在しない場合は事業者設定作成画面を表示
 - ダッシュボードに事業者設定編集画面への遷移ボタンを配置
-- 設定データは`Invoicy/settings.json`の1ファイルで管理
+- 設定データは`Invoicy/setting.json`の1ファイルで管理
+- 顧客・商品マスターデータは`Invoicy/masters/customers.jsonl`、`Invoicy/masters/products.jsonl`で管理（JSONL形式）
 
 ### 1.2 マスター管理機能
 

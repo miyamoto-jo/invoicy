@@ -18,7 +18,7 @@ export const useProductsStore = defineStore('products', () => {
   })
   
   // Google Drive API設定
-  const PRODUCTS_FILE = 'masters/products.json'
+  const PRODUCTS_FILE = 'masters/products.jsonl'
   
   // Actions
   const initializeProducts = async () => {
@@ -52,8 +52,20 @@ export const useProductsStore = defineStore('products', () => {
       // ファイルの内容を取得
       const content = await getFileContent(token, productsFile.id)
       
-      if (content && Array.isArray(content)) {
-        products.value = content
+      if (content && typeof content === 'string' && content.trim()) {
+        // JSONL形式の文字列を行ごとにパース
+        const lines = content.trim().split('\n')
+        const parsedProducts = []
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              parsedProducts.push(JSON.parse(line))
+            } catch (err) {
+              console.warn('Invalid JSON line in products.jsonl:', line, err)
+            }
+          }
+        }
+        products.value = parsedProducts
       } else {
         products.value = []
       }
@@ -93,8 +105,8 @@ export const useProductsStore = defineStore('products', () => {
         id: productId,
         name: productData.name.trim(),
         alias: productData.alias?.trim() || '',
-        price: Number(productData.price),
-        customerId: productData.customerId || null, // 使用顧客（任意）
+        priceExclTax: Number(productData.price),
+        usedByCustomerIds: productData.customerId ? [productData.customerId] : [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -160,8 +172,8 @@ export const useProductsStore = defineStore('products', () => {
             id: productId,
             name: productData.name.trim(),
             alias: productData.alias?.trim() || '',
-            price: Number(productData.price),
-            customerId: productData.customerId || null,
+            priceExclTax: Number(productData.price),
+            usedByCustomerIds: productData.customerId ? [productData.customerId] : [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           }
@@ -222,8 +234,8 @@ export const useProductsStore = defineStore('products', () => {
         ...existingProduct,
         name: productData.name.trim(),
         alias: productData.alias?.trim() || '',
-        price: Number(productData.price),
-        customerId: productData.customerId || null, // 使用顧客（任意）
+        priceExclTax: Number(productData.price),
+        usedByCustomerIds: productData.customerId ? [productData.customerId] : [],
         updatedAt: new Date().toISOString()
       }
       
@@ -309,9 +321,9 @@ export const useProductsStore = defineStore('products', () => {
       // mastersフォルダの取得または作成
       const mastersFolder = await getOrCreateFolder(token, appFolderId, 'masters')
       
-      // products.jsonファイルを検索
+      // products.jsonlファイルを検索
       const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='products.json' and '${mastersFolder.id}' in parents and trashed=false`,
+        `https://www.googleapis.com/drive/v3/files?q=name='products.jsonl' and '${mastersFolder.id}' in parents and trashed=false`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -329,7 +341,7 @@ export const useProductsStore = defineStore('products', () => {
         return data.files[0]
       }
       
-      // products.jsonファイルを作成
+      // products.jsonlファイルを作成
       const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: {
@@ -337,7 +349,7 @@ export const useProductsStore = defineStore('products', () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: 'products.json',
+          name: 'products.jsonl',
           parents: [mastersFolder.id]
         })
       })
@@ -348,8 +360,8 @@ export const useProductsStore = defineStore('products', () => {
       
       const file = await createResponse.json()
       
-      // 初期データ（空の配列）を設定
-      await updateFileContent(token, file.id, [])
+      // 初期データ（空のJSONLファイル）を設定
+      await updateFileContent(token, file.id, '')
       
       return file
       
@@ -365,8 +377,9 @@ export const useProductsStore = defineStore('products', () => {
       const appFolder = await authStore.getAppFolderId()
       const productsFile = await getOrCreateProductsFile(token, appFolder.id)
       
-      // ファイルの内容を更新
-      await updateFileContent(token, productsFile.id, products.value)
+      // ファイルの内容を更新（JSONL形式）
+      const jsonlContent = products.value.map(product => JSON.stringify(product)).join('\n')
+      await updateFileContent(token, productsFile.id, jsonlContent)
       
     } catch (err) {
       console.error('Failed to save products to file:', err)

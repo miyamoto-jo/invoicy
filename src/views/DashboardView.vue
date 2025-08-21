@@ -70,11 +70,28 @@
               <strong>データ保存先:</strong> Google Drive
             </div>
             <div class="info-item">
+              <strong>事業者:</strong> {{ settingsStore.businessSettings?.name || '未設定' }}
+            </div>
+            <div class="info-item">
               <strong>顧客数:</strong> {{ customersStore.customersCount }}件
             </div>
             <div class="info-item">
               <strong>税率数:</strong> {{ taxesStore.taxesCount }}件
             </div>
+          </div>
+        </div>
+        
+        <div class="business-settings-section">
+          <h3>事業者設定</h3>
+          <div class="business-info">
+            <div class="business-details">
+              <div class="business-name">{{ settingsStore.businessSettings?.name }}</div>
+              <div class="business-number">{{ settingsStore.businessSettings?.number }}</div>
+              <div class="business-representative">代表者: {{ settingsStore.businessSettings?.representative }}</div>
+            </div>
+            <router-link to="/business-settings" class="btn btn-primary">
+              編集
+            </router-link>
           </div>
         </div>
       </div>
@@ -85,18 +102,29 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
 import { useCustomersStore } from '../stores/customers'
 import { useTaxesStore } from '../stores/taxes'
 import { useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
 const customersStore = useCustomersStore()
 const taxesStore = useTaxesStore()
 const router = useRouter()
 
 onMounted(async () => {
-  // 顧客データと税率データを初期化
+  // 設定データを初期化
   try {
+    await settingsStore.initializeSettings()
+    
+    // 事業者設定が存在しない場合は設定画面にリダイレクト
+    if (!settingsStore.hasBusinessSettings) {
+      router.push('/business-settings')
+      return
+    }
+    
+    // 顧客データと税率データを初期化
     await Promise.all([
       customersStore.initializeCustomers(),
       taxesStore.initializeTaxes()
@@ -254,6 +282,47 @@ const handleSignOut = async () => {
   color: #155724;
 }
 
+.business-settings-section {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.business-settings-section h3 {
+  color: #333;
+  margin-bottom: 1.5rem;
+}
+
+.business-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.business-details {
+  flex: 1;
+}
+
+.business-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.business-number {
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.business-representative {
+  color: #666;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
@@ -266,6 +335,11 @@ const handleSignOut = async () => {
   
   .info-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .business-info {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style> 

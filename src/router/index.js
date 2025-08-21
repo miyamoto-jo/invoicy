@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 // Views
 import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
+import BusinessSettingsView from '../views/BusinessSettingsView.vue'
 import CustomersView from '../views/CustomersView.vue'
 import ProductsView from '../views/ProductsView.vue'
 import TaxesView from '../views/TaxesView.vue'
@@ -21,6 +22,12 @@ const routes = [
     path: '/dashboard',
     name: 'dashboard',
     component: DashboardView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/business-settings',
+    name: 'business-settings',
+    component: BusinessSettingsView,
     meta: { requiresAuth: true }
   },
   {
@@ -61,7 +68,7 @@ const router = createRouter({
 })
 
 // Navigation guard
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
@@ -70,6 +77,28 @@ router.beforeEach((to, from, next) => {
   } else if (to.name === 'login' && authStore.isAuthenticated) {
     // 認証済みでログインページにアクセスした場合
     next('/dashboard')
+  } else if (to.meta.requiresAuth && authStore.isAuthenticated) {
+    // 認証済みでダッシュボードにアクセスする場合、事業者設定の確認
+    if (to.name === 'dashboard') {
+      try {
+        // 設定ストアを動的にインポート
+        const { useSettingsStore } = await import('../stores/settings')
+        const settingsStore = useSettingsStore()
+        
+        // 設定の初期化
+        await settingsStore.initializeSettings()
+        
+        // 事業者設定が存在しない場合は設定画面にリダイレクト
+        if (!settingsStore.hasBusinessSettings) {
+          next('/business-settings')
+          return
+        }
+      } catch (err) {
+        console.error('Failed to check business settings:', err)
+        // エラーの場合はダッシュボードに進む
+      }
+    }
+    next()
   } else {
     next()
   }

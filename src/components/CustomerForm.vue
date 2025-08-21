@@ -50,6 +50,42 @@
         ></textarea>
       </div>
       
+      <div class="form-group">
+        <label for="closingDay" class="form-label">
+          締め日 <span class="required">*</span>
+        </label>
+        <select
+          id="closingDay"
+          v-model="formData.closingDay"
+          class="form-input"
+          :class="{ 'error': errors.closingDay }"
+          required
+        >
+          <option value="">選択してください</option>
+          <option v-for="day in 31" :key="day" :value="day">{{ day }}日</option>
+          <option value="末日">末日</option>
+        </select>
+        <span v-if="errors.closingDay" class="error-message">{{ errors.closingDay }}</span>
+      </div>
+      
+      <div class="form-group">
+        <label for="paymentMethod" class="form-label">
+          お支払い方法 <span class="required">*</span>
+        </label>
+        <select
+          id="paymentMethod"
+          v-model="formData.paymentMethod"
+          class="form-input"
+          :class="{ 'error': errors.paymentMethod }"
+          required
+        >
+          <option value="">選択してください</option>
+          <option value="振込">振込</option>
+          <option value="現金">現金</option>
+        </select>
+        <span v-if="errors.paymentMethod" class="error-message">{{ errors.paymentMethod }}</span>
+      </div>
+      
       <div class="form-actions">
         <button 
           type="button" 
@@ -91,11 +127,15 @@ const emit = defineEmits(['submit', 'close'])
 const formData = reactive({
   name: '',
   alias: '',
-  address: ''
+  address: '',
+  closingDay: '末日',
+  paymentMethod: '振込'
 })
 
 const errors = reactive({
-  name: ''
+  name: '',
+  closingDay: '',
+  paymentMethod: ''
 })
 
 const isEditing = computed(() => !!props.customer)
@@ -106,22 +146,40 @@ watch(() => props.customer, (customer) => {
     formData.name = customer.name || ''
     formData.alias = customer.alias || ''
     formData.address = customer.address || ''
+    formData.closingDay = customer.closingDay || ''
+    formData.paymentMethod = customer.paymentMethod || '振込'
   } else {
     // 新規作成時はフォームをリセット
     formData.name = ''
     formData.alias = ''
     formData.address = ''
+    formData.closingDay = '末日'
+    formData.paymentMethod = '振込'
   }
   // エラーをクリア
   errors.name = ''
+  errors.closingDay = ''
+  errors.paymentMethod = ''
 }, { immediate: true })
 
 const validateForm = () => {
   let isValid = true
   errors.name = ''
+  errors.closingDay = ''
+  errors.paymentMethod = ''
   
   if (!formData.name || formData.name.trim() === '') {
     errors.name = '顧客名は必須です'
+    isValid = false
+  }
+  
+  if (!formData.closingDay) {
+    errors.closingDay = '締め日は必須です'
+    isValid = false
+  }
+  
+  if (!formData.paymentMethod) {
+    errors.paymentMethod = 'お支払い方法は必須です'
     isValid = false
   }
   
@@ -136,7 +194,9 @@ const handleSubmit = () => {
   const customerData = {
     name: formData.name.trim(),
     alias: formData.alias.trim(),
-    address: formData.address.trim()
+    address: formData.address.trim(),
+    closingDay: formData.closingDay === '末日' ? '末日' : parseInt(formData.closingDay),
+    paymentMethod: formData.paymentMethod
   }
   
   emit('submit', customerData)

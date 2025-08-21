@@ -78,6 +78,14 @@
             <span class="label">住所:</span>
             <span>{{ customer.address }}</span>
           </div>
+          <div class="customer-closing-day">
+            <span class="label">締め日:</span>
+            <span>{{ customer.closingDay === '末日' ? '末日' : customer.closingDay + '日' }}</span>
+          </div>
+          <div class="customer-payment-method">
+            <span class="label">お支払い方法:</span>
+            <span>{{ customer.paymentMethod }}</span>
+          </div>
         </div>
         
         <div class="customer-meta">
@@ -348,14 +356,18 @@ watch(searchQuery, (newQuery) => {
 }
 
 .customer-alias,
-.customer-address {
+.customer-address,
+.customer-closing-day,
+.customer-payment-method {
   margin-bottom: 8px;
   font-size: 14px;
   line-height: 1.4;
 }
 
 .customer-alias .label,
-.customer-address .label {
+.customer-address .label,
+.customer-closing-day .label,
+.customer-payment-method .label {
   font-weight: 500;
   color: #666;
   margin-right: 5px;

@@ -64,6 +64,8 @@
       "name": "顧客名称",
       "alias": "顧客管理用名称",
       "address": "住所",
+      "closingDay": "末日",
+      "paymentMethod": "振込",
       "createdAt": "2025-08-16T12:34:56+09:00",
       "updatedAt": "2025-08-16T12:34:56+09:00"
     }
@@ -191,7 +193,7 @@
 
 ## 6. バリデーション（例）
 
-- 顧客：`name` 必須、`alias` 任意、`address` 任意
+- 顧客：`name` 必須、`alias` 任意、`address` 任意、`closingDay` 1〜31の範囲または末日（必須）、`paymentMethod` 振込または現金（必須）
 - 商品：`name` 必須、`priceExclTax >= 0`、`usedByCustomerIds` は配列/空可
 - 税率：整数（例：8 または 10）
 - 伝票：`lines.length >= 1`、各 `qty > 0`、`unitPriceExclTax >= 0`、`taxRate` は登録済みのみ

@@ -90,6 +90,8 @@ export const useCustomersStore = defineStore('customers', () => {
         name: customerData.name.trim(),
         alias: customerData.alias?.trim() || '',
         address: customerData.address?.trim() || '',
+        closingDay: customerData.closingDay,
+        paymentMethod: customerData.paymentMethod,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -133,6 +135,14 @@ export const useCustomersStore = defineStore('customers', () => {
         if (!customerData.name || customerData.name.trim() === '') {
           validationErrors.push(`顧客${index + 1}: 顧客名は必須です`)
         }
+        if (!customerData.closingDay) {
+          validationErrors.push(`顧客${index + 1}: 締め日は必須です`)
+        } else if (customerData.closingDay !== '末日' && (customerData.closingDay < 1 || customerData.closingDay > 31)) {
+          validationErrors.push(`顧客${index + 1}: 締め日は1〜31の範囲または末日で入力してください`)
+        }
+        if (!customerData.paymentMethod) {
+          validationErrors.push(`顧客${index + 1}: お支払い方法は必須です`)
+        }
       })
       
       if (validationErrors.length > 0) {
@@ -152,6 +162,8 @@ export const useCustomersStore = defineStore('customers', () => {
             name: customerData.name.trim(),
             alias: customerData.alias?.trim() || '',
             address: customerData.address?.trim() || '',
+            closingDay: customerData.closingDay,
+            paymentMethod: customerData.paymentMethod,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           }
@@ -196,6 +208,15 @@ export const useCustomersStore = defineStore('customers', () => {
       if (!customerData.name || customerData.name.trim() === '') {
         throw new Error('顧客名は必須です')
       }
+      if (!customerData.closingDay) {
+        throw new Error('締め日は必須です')
+      }
+      if (customerData.closingDay !== '末日' && (customerData.closingDay < 1 || customerData.closingDay > 31)) {
+        throw new Error('締め日は1〜31の範囲または末日で入力してください')
+      }
+      if (!customerData.paymentMethod) {
+        throw new Error('お支払い方法は必須です')
+      }
       
       // 既存の顧客を検索
       const existingCustomer = customers.value.find(c => c.id === customerId)
@@ -209,6 +230,8 @@ export const useCustomersStore = defineStore('customers', () => {
         name: customerData.name.trim(),
         alias: customerData.alias?.trim() || '',
         address: customerData.address?.trim() || '',
+        closingDay: customerData.closingDay,
+        paymentMethod: customerData.paymentMethod,
         updatedAt: new Date().toISOString()
       }
       

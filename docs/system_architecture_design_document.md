@@ -34,7 +34,7 @@
 ### 3.1 フォルダ構成
 
 - ルート：`/Invoicy/`（初回起動時に存在確認→なければ作成）
-  - `settings.json`  … 設定（アプリ設定を1ファイルで管理）
+  - `settings.json`  … 設定（事業者設定・アプリ設定を1ファイルで管理）
   - `masters/`
     - `customers.json` … 顧客マスター（全顧客データを1ファイルで管理）
     - `products.json`  … 商品マスター（全商品データを1ファイルで管理）
@@ -105,13 +105,22 @@
 }
 ```
 
-**設定（masters/settings.json）**
+**設定（settings.json）**
 
 ```json
-{ "rounding": "floor", "defaultTaxRate": 10 }
+{
+    "name": "事業者名",
+    "number": "T1234567890123",
+    "representative": "代表者名",
+    "bankInfo": "振込先情報",
+    "phone": "電話番号",
+    "address": "住所",
+    "createdAt": "2025-08-16T12:34:56+09:00",
+    "updatedAt": "2025-08-16T12:34:56+09:00"
+}
 ```
 
-> **rounding**: `"floor"`=切捨て, `"ceil"`=切上げ, `"round"`=四捨五入 （JST基準の計算日付）
+> **business**: 事業者設定情報
 
 **伝票（sales/{YYYYMMDD}\_*****{******customerId******}\_*****{ticketId}.json）**
 
@@ -153,7 +162,14 @@
 
 ## 4. 主要ユースケースとシーケンス
 
-### 4.1 マスター CRUD
+### 4.1 事業者設定管理
+
+1. 初回ログイン時：`settings.json`が存在しない場合、事業者設定作成画面を表示
+2. 設定入力 → バリデーション（必須項目、事業者番号のT始まり）
+3. `settings.json`を`files.create`で作成
+4. 更新時：既存の`settings.json`を取得 → 事業者情報を更新 → `files.update`で保存
+
+### 4.2 マスター CRUD
 
 1. UI 入力 → バリデーション（必須、型、範囲）
 2. Drive 上の対象マスターファイルを取得（なければ作成）
@@ -183,6 +199,8 @@
 
 ## 5. 画面（概要）
 
+- **Dashboard**：メイン画面、事業者設定編集ボタン配置
+- **BusinessSettings**：事業者設定作成・編集画面
 - **Customers**：一覧／検索／新規／編集／削除
 - **Products**：一覧／新規／編集／削除（価格＝税抜）
 - **Taxes**：一覧／登録／削除（単純な率の管理）
@@ -193,6 +211,7 @@
 
 ## 6. バリデーション（例）
 
+- 事業者設定：`name` 必須、`number` 必須かつT始まり、`representative` 必須、その他は任意
 - 顧客：`name` 必須、`alias` 任意、`address` 任意、`closingDay` 1〜31の範囲または末日（必須）、`paymentMethod` 振込または現金（必須）
 - 商品：`name` 必須、`priceExclTax >= 0`、`usedByCustomerIds` は配列/空可
 - 税率：整数（例：8 または 10）
@@ -237,6 +256,8 @@
 
 受け入れの観点（要件トレース）
 
+- 初回ログイン時に事業者設定作成画面が表示され、設定が Drive 上で保存される
+- ダッシュボードから事業者設定編集画面に遷移できる
 - 顧客/商品/税率マスターの CRUD が Drive 上で反映される
 - 売上登録が Drive に 1 伝票 = 1 ファイルとして保存される
 - 売上閲覧で期間・顧客・商品フィルタが機能する

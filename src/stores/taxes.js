@@ -8,6 +8,8 @@ export const useTaxesStore = defineStore('taxes', () => {
   const isLoading = ref(false)
   const error = ref(null)
   const selectedTax = ref(null)
+  const rounding = ref('floor') // 端数計算方式: floor, ceil, round
+  const defaultTaxId = ref('tax_10') // デフォルト税率ID
   
   // Computed
   const taxesCount = computed(() => taxes.value.length)
@@ -62,6 +64,9 @@ export const useTaxesStore = defineStore('taxes', () => {
       } else {
         taxes.value = []
       }
+      
+      // taxes.jsonからroundingとdefault_tax_idを読み込み
+      await loadTaxSettingsFromTaxesFile(token, appFolder.id)
       
     } catch (err) {
       console.error('Failed to load taxes:', err)
@@ -206,6 +211,13 @@ export const useTaxesStore = defineStore('taxes', () => {
     return taxes.value.filter(tax => tax.isActive)
   })
   
+  // 端数計算方式のオプション
+  const roundingOptions = [
+    { value: 'floor', label: '切り捨て' },
+    { value: 'ceil', label: '切り上げ' },
+    { value: 'round', label: '四捨五入' }
+  ]
+  
   // Google Drive API ヘルパー関数
   const getOrCreateMastersFolder = async (token, appFolderId) => {
     try {
@@ -303,9 +315,9 @@ export const useTaxesStore = defineStore('taxes', () => {
       const newFile = await createResponse.json()
       
       // 初期データで初期化
-      const initialData = [
+      const initialTaxes = [
         {
-          "id": "tax_standard",
+          "id": "tax_10",
           "rate": 10.0,
           "description": "一般的な商品・サービスに適用される標準税率",
           "isActive": true,
@@ -313,7 +325,7 @@ export const useTaxesStore = defineStore('taxes', () => {
           "updatedAt": new Date().toISOString()
         },
         {
-          "id": "tax_reduced",
+          "id": "tax_8",
           "rate": 8.0,
           "description": "食品・新聞などに適用される軽減税率",
           "isActive": true,
@@ -321,7 +333,7 @@ export const useTaxesStore = defineStore('taxes', () => {
           "updatedAt": new Date().toISOString()
         },
         {
-          "id": "tax_zero",
+          "id": "tax_0",
           "rate": 0.0,
           "description": "非課税商品・サービス",
           "isActive": true,
@@ -329,6 +341,13 @@ export const useTaxesStore = defineStore('taxes', () => {
           "updatedAt": new Date().toISOString()
         }
       ]
+      
+      const initialData = {
+        taxes: initialTaxes,
+        rounding: 'floor',
+        default_tax_id: 'tax_10',
+        lastUpdated: new Date().toISOString()
+      }
       
       await updateFileContent(token, newFile.id, initialData)
       
@@ -396,10 +415,92 @@ export const useTaxesStore = defineStore('taxes', () => {
       const authStore = useAuthStore()
       const appFolder = await authStore.getAppFolderId()
       const taxesFile = await getOrCreateTaxesFile(token, appFolder.id)
-      await updateFileContent(token, taxesFile.id, taxes.value)
+      
+      // 新しい形式でデータを構築
+      const taxesData = {
+        taxes: taxes.value,
+        rounding: rounding.value,
+        default_tax_id: defaultTaxId.value,
+        lastUpdated: new Date().toISOString()
+      }
+      
+      await updateFileContent(token, taxesFile.id, taxesData)
     } catch (err) {
       console.error('Failed to save taxes to file:', err)
       throw err
+    }
+  }
+  
+  // 税率設定の読み込み（taxes.jsonから）
+  const loadTaxSettingsFromTaxesFile = async (token, appFolderId) => {
+    try {
+      // taxes.jsonファイルを取得
+      const taxesFile = await getOrCreateTaxesFile(token, appFolderId)
+      const content = await getFileContent(token, taxesFile.id)
+      
+      if (content && typeof content === 'object' && !Array.isArray(content)) {
+        // オブジェクト形式の場合（新しい形式）
+        rounding.value = content.rounding || 'floor'
+        defaultTaxId.value = content.default_tax_id || 'tax_10'
+        taxes.value = content.taxes || []
+      } else if (content && Array.isArray(content)) {
+        // 配列形式の場合（古い形式）
+        taxes.value = content
+        rounding.value = 'floor'
+        defaultTaxId.value = 'tax_10'
+      } else {
+        // ファイルが空の場合
+        taxes.value = []
+        rounding.value = 'floor'
+        defaultTaxId.value = 'tax_10'
+      }
+    } catch (err) {
+      console.error('Failed to load tax settings from taxes file:', err)
+      // エラーの場合はデフォルト値を使用
+      taxes.value = []
+      rounding.value = 'floor'
+      defaultTaxId.value = 'tax_10'
+    }
+  }
+  
+  // 税率設定の更新（taxes.jsonに保存）
+  const updateTaxSettings = async (newRounding, newDefaultTaxId) => {
+    try {
+      isLoading.value = true
+      error.value = null
+      
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+      
+      // taxes.jsonファイルを取得
+      const appFolder = await authStore.getAppFolderId()
+      const taxesFile = await getOrCreateTaxesFile(token, appFolder.id)
+      
+      // 新しい形式でデータを構築
+      const taxesData = {
+        taxes: taxes.value,
+        rounding: newRounding,
+        default_tax_id: newDefaultTaxId,
+        lastUpdated: new Date().toISOString()
+      }
+      
+      // ファイルを更新
+      await updateFileContent(token, taxesFile.id, taxesData)
+      
+      // ローカル状態を更新
+      rounding.value = newRounding
+      defaultTaxId.value = newDefaultTaxId
+      
+    } catch (err) {
+      console.error('Failed to update tax settings:', err)
+      error.value = err.message || '税率設定の更新に失敗しました'
+      throw err
+    } finally {
+      isLoading.value = false
     }
   }
   
@@ -409,11 +510,14 @@ export const useTaxesStore = defineStore('taxes', () => {
     isLoading,
     error,
     selectedTax,
+    rounding,
+    defaultTaxId,
     
     // Computed
     taxesCount,
     sortedTaxes,
     getActiveTaxes,
+    roundingOptions,
     
     // Actions
     initializeTaxes,
@@ -421,6 +525,7 @@ export const useTaxesStore = defineStore('taxes', () => {
     createTax,
     updateTax,
     deleteTax,
-    getTaxById
+    getTaxById,
+    updateTaxSettings
   }
 }) 

@@ -34,7 +34,7 @@
 ### 3.1 フォルダ構成
 
 - ルート：`/Invoicy/`（初回起動時に存在確認→なければ作成）
-  - `settings.json`  … 設定（事業者設定・アプリ設定を1ファイルで管理）
+  - `setting.json`  … 設定（事業者設定・アプリ設定を1ファイルで管理）
   - `masters/`
     - `customers.json` … 顧客マスター（全顧客データを1ファイルで管理）
     - `products.json`  … 商品マスター（全商品データを1ファイルで管理）
@@ -107,7 +107,7 @@
 }
 ```
 
-**設定（settings.json）**
+**設定（setting.json）**
 
 ```json
 {
@@ -166,10 +166,10 @@
 
 ### 4.1 事業者設定管理
 
-1. 初回ログイン時：`settings.json`が存在しない場合、事業者設定作成画面を表示
+1. 初回ログイン時：`setting.json`が存在しない場合、事業者設定作成画面を表示
 2. 設定入力 → バリデーション（必須項目、事業者番号のT始まり）
-3. `settings.json`を`files.create`で作成
-4. 更新時：既存の`settings.json`を取得 → 事業者情報を更新 → `files.update`で保存
+3. `setting.json`を`files.create`で作成
+4. 更新時：既存の`setting.json`を取得 → 事業者情報を更新 → `files.update`で保存
 
 ### 4.2 マスター CRUD
 

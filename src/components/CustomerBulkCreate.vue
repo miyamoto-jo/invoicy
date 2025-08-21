@@ -28,6 +28,8 @@
               <th>顧客名 *</th>
               <th>管理用名称</th>
               <th>住所</th>
+              <th>締め日</th>
+              <th>お支払い方法</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -62,6 +64,30 @@
                   class="form-input"
                   placeholder="住所"
                 />
+              </td>
+              <td>
+                <select
+                  v-model="row.closingDay"
+                  class="form-input"
+                  :class="{ 'error': row.errors.closingDay }"
+                >
+                  <option value="">選択</option>
+                  <option v-for="day in 31" :key="day" :value="day">{{ day }}日</option>
+                  <option value="末日">末日</option>
+                </select>
+                <span v-if="row.errors.closingDay" class="error-message">{{ row.errors.closingDay }}</span>
+              </td>
+              <td>
+                <select
+                  v-model="row.paymentMethod"
+                  class="form-input"
+                  :class="{ 'error': row.errors.paymentMethod }"
+                >
+                  <option value="">選択</option>
+                  <option value="振込">振込</option>
+                  <option value="現金">現金</option>
+                </select>
+                <span v-if="row.errors.paymentMethod" class="error-message">{{ row.errors.paymentMethod }}</span>
               </td>
               <td>
                 <button
@@ -112,11 +138,11 @@ const props = defineProps({
 const emit = defineEmits(['submit', 'cancel'])
 
 // ローカル状態
-const customerRows = ref([{ name: '', alias: '', address: '', errors: {} }])
+const customerRows = ref([{ name: '', alias: '', address: '', closingDay: '末日', paymentMethod: '振込', errors: {} }])
 
 // 手動入力の行操作
 const addCustomerRow = () => {
-  customerRows.value.push({ name: '', alias: '', address: '', errors: {} })
+  customerRows.value.push({ name: '', alias: '', address: '', closingDay: '末日', paymentMethod: '振込', errors: {} })
 }
 
 const removeCustomerRow = (index) => {
@@ -126,7 +152,7 @@ const removeCustomerRow = (index) => {
 }
 
 const clearAll = () => {
-  customerRows.value = [{ name: '', alias: '', address: '', errors: {} }]
+  customerRows.value = [{ name: '', alias: '', address: '', closingDay: '末日', paymentMethod: '振込', errors: {} }]
 }
 
 // バリデーション
@@ -135,6 +161,16 @@ const validateCustomerRow = (row) => {
   
   if (!row.name || row.name.trim() === '') {
     errors.name = '顧客名は必須です'
+  }
+  
+  if (!row.closingDay) {
+    errors.closingDay = '締め日は必須です'
+  } else if (row.closingDay !== '末日' && (row.closingDay < 1 || row.closingDay > 31)) {
+    errors.closingDay = '締め日は1〜31の範囲または末日で入力してください'
+  }
+  
+  if (!row.paymentMethod) {
+    errors.paymentMethod = 'お支払い方法は必須です'
   }
   
   return errors
@@ -162,7 +198,9 @@ const handleSubmit = () => {
   const customersData = customerRows.value.map(row => ({
     name: row.name.trim(),
     alias: row.alias.trim(),
-    address: row.address.trim()
+    address: row.address.trim(),
+    closingDay: row.closingDay === '末日' ? '末日' : parseInt(row.closingDay),
+    paymentMethod: row.paymentMethod
   }))
   
   emit('submit', customersData)

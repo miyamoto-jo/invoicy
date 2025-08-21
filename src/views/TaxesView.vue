@@ -14,8 +14,51 @@
     <main class="main">
       <div class="container">
         <div class="content-wrapper">
+          <!-- 税率設定 -->
+          <div class="content-section">
+            <h2>税率設定</h2>
+            <div class="settings-form">
+              <div class="form-group">
+                <label for="rounding">端数計算方式</label>
+                <select 
+                  id="rounding" 
+                  v-model="taxesStore.rounding"
+                  @change="handleRoundingChange"
+                  :disabled="taxesStore.isLoading"
+                >
+                  <option 
+                    v-for="option in taxesStore.roundingOptions" 
+                    :key="option.value" 
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label for="defaultTax">デフォルト税率</label>
+                <select 
+                  id="defaultTax" 
+                  v-model="taxesStore.defaultTaxId"
+                  @change="handleDefaultTaxChange"
+                  :disabled="taxesStore.isLoading"
+                >
+                  <option 
+                    v-for="tax in taxesStore.getActiveTaxes" 
+                    :key="tax.id" 
+                    :value="tax.id"
+                  >
+                    {{ tax.rate }}% {{ tax.description ? `(${tax.description})` : '' }}
+                  </option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
           <!-- 税率一覧 -->
           <div class="content-section">
+            <h2>税率マスター</h2>
             <TaxList
               :taxes="taxesStore.sortedTaxes"
               :is-loading="taxesStore.isLoading"
@@ -102,6 +145,22 @@ const handleRetry = async () => {
   }
 }
 
+const handleRoundingChange = async () => {
+  try {
+    await taxesStore.updateTaxSettings(taxesStore.rounding, taxesStore.defaultTaxId)
+  } catch (err) {
+    console.error('Failed to update rounding:', err)
+  }
+}
+
+const handleDefaultTaxChange = async () => {
+  try {
+    await taxesStore.updateTaxSettings(taxesStore.rounding, taxesStore.defaultTaxId)
+  } catch (err) {
+    console.error('Failed to update default tax:', err)
+  }
+}
+
 const closeForm = () => {
   showForm.value = false
   editingTax.value = null
@@ -145,6 +204,54 @@ const closeForm = () => {
   border-radius: 8px;
   padding: 2rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.content-section h2 {
+  color: #333;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.settings-form {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.form-group select {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background: white;
+  transition: border-color 0.3s;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.form-group select:disabled {
+  background: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
 }
 
 .btn {
@@ -208,6 +315,15 @@ const closeForm = () => {
   
   .modal-content {
     margin: 1rem;
+  }
+  
+  .settings-form {
+    gap: 1rem;
+  }
+  
+  .form-group select {
+    padding: 0.5rem;
+    font-size: 0.9rem;
   }
 }
 </style> 

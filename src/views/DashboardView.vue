@@ -1,18 +1,8 @@
 <template>
-  <div class="dashboard">
-    <header class="header">
-      <div class="container">
-        <div class="header-content">
-          <h1>Invoicy</h1>
-        </div>
-      </div>
-    </header>
-    
-    <main class="main">
-      <div class="container">
+  <AppLayout>
         <div class="welcome-section">
           <h2>ようこそ、{{ authStore.userName }}さん</h2>
-          <p>請求書管理システムへようこそ。左側のメニューから機能を選択してください。</p>
+          <p>請求書管理システムへようこそ。左上のアイコンをタップしてメニューを開き、機能を選択してください。</p>
         </div>
         
         <div class="quick-actions">
@@ -93,9 +83,7 @@
         <div class="sales-analysis-section">
           <SalesAnalysis :refresh-trigger="refreshTrigger" />
         </div>
-      </div>
-    </main>
-  </div>
+      </AppLayout>
 </template>
 
 <script setup>
@@ -106,6 +94,7 @@ import { useCustomersStore } from '../stores/customers'
 import { useTaxesStore } from '../stores/taxes'
 import { useRouter } from 'vue-router'
 import SalesAnalysis from '../components/SalesAnalysis.vue'
+import AppLayout from '../components/AppLayout.vue'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
@@ -153,37 +142,11 @@ onMounted(async () => {
 })
 
 
+
+
 </script>
 
 <style scoped>
-.dashboard {
-  min-height: 100vh;
-  background-color: #f5f5f5;
-}
-
-.header {
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 1rem 0;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header h1 {
-  color: #333;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-
-
-.main {
-  padding: 2rem 0;
-}
 
 .welcome-section {
   background: white;
@@ -338,6 +301,17 @@ onMounted(async () => {
   .header-content {
     flex-direction: column;
     gap: 1rem;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+  
+  .title-section {
+    align-items: center;
+  }
+  
+  .user-avatar {
+    width: 32px;
+    height: 32px;
   }
   
   .action-grid {

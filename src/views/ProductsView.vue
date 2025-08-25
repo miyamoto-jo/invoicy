@@ -1,18 +1,10 @@
 <template>
-  <div class="products">
-    <header class="header">
-      <div class="container">
-        <div class="header-content">
-          <h1>商品管理</h1>
-          <router-link to="/dashboard" class="btn btn-secondary">
-            ダッシュボードに戻る
-          </router-link>
-        </div>
-      </div>
-    </header>
+  <AppLayout>
+    <div class="products-header">
+      <h1>商品管理</h1>
+    </div>
     
-    <main class="main">
-      <div class="container">
+    <div class="products-content">
         <!-- 商品一覧 -->
         <div v-if="!showForm && !showBulkCreate" class="card">
           <div class="card-header">
@@ -73,9 +65,8 @@
             @cancel="hideBulkCreateForm"
           />
         </div>
-      </div>
-    </main>
-  </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup>
@@ -84,6 +75,7 @@ import { useProductsStore } from '../stores/products'
 import ProductList from '../components/ProductList.vue'
 import ProductForm from '../components/ProductForm.vue'
 import ProductBulkCreate from '../components/ProductBulkCreate.vue'
+import AppLayout from '../components/AppLayout.vue'
 
 const productsStore = useProductsStore()
 
@@ -175,37 +167,23 @@ const handleDelete = async (productId) => {
 </script>
 
 <style scoped>
-.products {
-  min-height: 100vh;
-  background-color: #f5f5f5;
-}
-
-.header {
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 1rem 0;
-}
-
-.header-content {
+.products-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 2rem;
 }
 
-.header h1 {
+.products-header h1 {
   color: #333;
   font-size: 1.5rem;
   font-weight: 600;
+  margin: 0;
 }
 
-.main {
-  padding: 2rem 0;
-}
-
-.container {
+.products-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem;
 }
 
 .card {

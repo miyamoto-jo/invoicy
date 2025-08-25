@@ -25,7 +25,8 @@ export const useAuthStore = defineStore('auth', () => {
   
   // Sub folders to create in the app folder
   const SUB_FOLDERS = [
-    'masters'
+    'masters',
+    'sales'
   ]
   
   // Computed

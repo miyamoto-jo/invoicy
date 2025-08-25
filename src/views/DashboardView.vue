@@ -94,24 +94,33 @@
             </router-link>
           </div>
         </div>
+
+        <!-- 売上分析セクション -->
+        <div class="sales-analysis-section">
+          <SalesAnalysis :refresh-trigger="refreshTrigger" />
+        </div>
       </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { useCustomersStore } from '../stores/customers'
 import { useTaxesStore } from '../stores/taxes'
 import { useRouter } from 'vue-router'
+import SalesAnalysis from '../components/SalesAnalysis.vue'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const customersStore = useCustomersStore()
 const taxesStore = useTaxesStore()
 const router = useRouter()
+
+// Reactive data
+const refreshTrigger = ref(0)
 
 onMounted(async () => {
   // 設定データを初期化
@@ -321,6 +330,10 @@ const handleSignOut = async () => {
 .business-representative {
   color: #666;
   font-size: 0.9rem;
+}
+
+.sales-analysis-section {
+  margin-bottom: 2rem;
 }
 
 @media (max-width: 768px) {

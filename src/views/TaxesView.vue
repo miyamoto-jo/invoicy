@@ -1,90 +1,77 @@
 <template>
-  <div class="taxes">
-    <header class="header">
-      <div class="container">
-        <div class="header-content">
-          <h1>税率管理</h1>
-          <router-link to="/dashboard" class="btn btn-secondary">
-            ダッシュボードに戻る
-          </router-link>
-        </div>
-      </div>
-    </header>
-    
-    <main class="main">
-      <div class="container">
-        <div class="content-wrapper">
-          <!-- 税率設定 -->
-          <div class="content-section">
-            <h2>税率設定</h2>
-            <div class="settings-form">
-              <div class="form-group">
-                <label for="rounding">端数計算方式</label>
-                <select 
-                  id="rounding" 
-                  v-model="taxesStore.rounding"
-                  @change="handleRoundingChange"
-                  :disabled="taxesStore.isLoading"
+  <AppLayout>
+    <div class="taxes">
+      <div class="content-wrapper">
+        <!-- 税率設定 -->
+        <div class="content-section">
+          <h2>税率設定</h2>
+          <div class="settings-form">
+            <div class="form-group">
+              <label for="rounding">端数計算方式</label>
+              <select 
+                id="rounding" 
+                v-model="taxesStore.rounding"
+                @change="handleRoundingChange"
+                :disabled="taxesStore.isLoading"
+              >
+                <option 
+                  v-for="option in taxesStore.roundingOptions" 
+                  :key="option.value" 
+                  :value="option.value"
                 >
-                  <option 
-                    v-for="option in taxesStore.roundingOptions" 
-                    :key="option.value" 
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
-              </div>
-              
-              <div class="form-group">
-                <label for="defaultTax">デフォルト税率</label>
-                <select 
-                  id="defaultTax" 
-                  v-model="taxesStore.defaultTaxId"
-                  @change="handleDefaultTaxChange"
-                  :disabled="taxesStore.isLoading"
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="defaultTax">デフォルト税率</label>
+              <select 
+                id="defaultTax" 
+                v-model="taxesStore.defaultTaxId"
+                @change="handleDefaultTaxChange"
+                :disabled="taxesStore.isLoading"
+              >
+                <option 
+                  v-for="tax in taxesStore.getActiveTaxes" 
+                  :key="tax.id" 
+                  :value="tax.id"
                 >
-                  <option 
-                    v-for="tax in taxesStore.getActiveTaxes" 
-                    :key="tax.id" 
-                    :value="tax.id"
-                  >
-                    {{ tax.rate }}% {{ tax.description ? `(${tax.description})` : '' }}
-                  </option>
-                </select>
-              </div>
+                  {{ tax.rate }}% {{ tax.description ? `(${tax.description})` : '' }}
+                </option>
+              </select>
             </div>
           </div>
-          
-          <!-- 税率一覧 -->
-          <div class="content-section">
-            <h2>税率マスター</h2>
-            <TaxList
-              :taxes="taxesStore.sortedTaxes"
+        </div>
+        
+        <!-- 税率一覧 -->
+        <div class="content-section">
+          <h2>税率マスター</h2>
+          <TaxList
+            :taxes="taxesStore.sortedTaxes"
+            :is-loading="taxesStore.isLoading"
+            :error="taxesStore.error"
+            @add="showForm = true"
+            @edit="handleEdit"
+            @delete="handleDelete"
+            @retry="handleRetry"
+          />
+        </div>
+        
+        <!-- 税率フォーム（モーダル） -->
+        <div v-if="showForm" class="modal-overlay" @click="closeForm">
+          <div class="modal-content" @click.stop>
+            <TaxForm
+              :tax="editingTax"
               :is-loading="taxesStore.isLoading"
-              :error="taxesStore.error"
-              @add="showForm = true"
-              @edit="handleEdit"
-              @delete="handleDelete"
-              @retry="handleRetry"
+              @submit="handleSubmit"
+              @close="closeForm"
             />
           </div>
-          
-          <!-- 税率フォーム（モーダル） -->
-          <div v-if="showForm" class="modal-overlay" @click="closeForm">
-            <div class="modal-content" @click.stop>
-              <TaxForm
-                :tax="editingTax"
-                :is-loading="taxesStore.isLoading"
-                @submit="handleSubmit"
-                @close="closeForm"
-              />
-            </div>
-          </div>
         </div>
       </div>
-    </main>
-  </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup>
@@ -92,6 +79,7 @@ import { ref, onMounted } from 'vue'
 import { useTaxesStore } from '../stores/taxes'
 import TaxList from '../components/TaxList.vue'
 import TaxForm from '../components/TaxForm.vue'
+import AppLayout from '../components/AppLayout.vue'
 
 const taxesStore = useTaxesStore()
 
@@ -171,28 +159,6 @@ const closeForm = () => {
 .taxes {
   min-height: 100vh;
   background-color: #f5f5f5;
-}
-
-.header {
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 1rem 0;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header h1 {
-  color: #333;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.main {
-  padding: 2rem 0;
 }
 
 .content-wrapper {
@@ -304,11 +270,6 @@ const closeForm = () => {
 }
 
 @media (max-width: 768px) {
-  .header-content {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
   .content-section {
     padding: 1rem;
   }

@@ -1,149 +1,133 @@
 <template>
-  <div class="business-settings">
-    <header class="header">
-      <div class="container">
-        <div class="header-content">
-          <h1>事業者設定</h1>
-          <div class="user-info">
-            <span>{{ authStore.userName }}</span>
-            <button @click="handleSignOut" class="btn btn-secondary">
-              サインアウト
+  <AppLayout>
+    <div class="business-settings">
+      <div class="settings-form">
+        <div class="form-header">
+          <h2>{{ isEditMode ? '事業者設定の編集' : '事業者設定の作成' }}</h2>
+          <p>{{ isEditMode ? '事業者情報を編集できます。' : '初回設定です。事業者情報を入力してください。' }}</p>
+        </div>
+        
+        <form @submit.prevent="handleSubmit" class="form">
+          <div class="form-group">
+            <label for="name" class="form-label">
+              事業者名 <span class="required">*</span>
+            </label>
+            <input
+              id="name"
+              v-model="formData.name"
+              type="text"
+              class="form-input"
+              :class="{ 'error': errors.name }"
+              placeholder="例: 株式会社サンプル"
+              required
+            />
+            <div v-if="errors.name" class="error-message">{{ errors.name }}</div>
+          </div>
+          
+          <div class="form-group">
+            <label for="number" class="form-label">
+              事業者番号 <span class="required">*</span>
+            </label>
+            <input
+              id="number"
+              v-model="formData.number"
+              type="text"
+              class="form-input"
+              :class="{ 'error': errors.number }"
+              placeholder="例: T1234567890123"
+              required
+            />
+            <div class="form-hint">Tから始まる番号を入力してください</div>
+            <div v-if="errors.number" class="error-message">{{ errors.number }}</div>
+          </div>
+          
+          <div class="form-group">
+            <label for="representative" class="form-label">
+              代表者名 <span class="required">*</span>
+            </label>
+            <input
+              id="representative"
+              v-model="formData.representative"
+              type="text"
+              class="form-input"
+              :class="{ 'error': errors.representative }"
+              placeholder="例: 山田太郎"
+              required
+            />
+            <div v-if="errors.representative" class="error-message">{{ errors.representative }}</div>
+          </div>
+          
+          <div class="form-group">
+            <label for="bankInfo" class="form-label">
+              振込先情報
+            </label>
+            <textarea
+              id="bankInfo"
+              v-model="formData.bankInfo"
+              class="form-textarea"
+              :class="{ 'error': errors.bankInfo }"
+              placeholder="例: 〇〇銀行 〇〇支店 普通 1234567 株式会社サンプル"
+              rows="3"
+            ></textarea>
+            <div v-if="errors.bankInfo" class="error-message">{{ errors.bankInfo }}</div>
+          </div>
+          
+          <div class="form-group">
+            <label for="phone" class="form-label">
+              電話番号
+            </label>
+            <input
+              id="phone"
+              v-model="formData.phone"
+              type="tel"
+              class="form-input"
+              :class="{ 'error': errors.phone }"
+              placeholder="例: 03-1234-5678"
+            />
+            <div v-if="errors.phone" class="error-message">{{ errors.phone }}</div>
+          </div>
+          
+          <div class="form-group">
+            <label for="address" class="form-label">
+              住所
+            </label>
+            <textarea
+              id="address"
+              v-model="formData.address"
+              class="form-textarea"
+              :class="{ 'error': errors.address }"
+              placeholder="例: 〒100-0001 東京都千代田区千代田1-1-1"
+              rows="3"
+            ></textarea>
+            <div v-if="errors.address" class="error-message">{{ errors.address }}</div>
+          </div>
+          
+          <div class="form-actions">
+            <button
+              type="button"
+              @click="handleCancel"
+              class="btn btn-secondary"
+              :disabled="settingsStore.isLoading"
+            >
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              :disabled="settingsStore.isLoading"
+            >
+              <span v-if="settingsStore.isLoading" class="loading-spinner"></span>
+              {{ isEditMode ? '更新' : '作成' }}
             </button>
           </div>
+        </form>
+        
+        <div v-if="settingsStore.error" class="error-alert">
+          {{ settingsStore.error }}
         </div>
       </div>
-    </header>
-    
-    <main class="main">
-      <div class="container">
-        <div class="settings-form">
-          <div class="form-header">
-            <h2>{{ isEditMode ? '事業者設定の編集' : '事業者設定の作成' }}</h2>
-            <p>{{ isEditMode ? '事業者情報を編集できます。' : '初回設定です。事業者情報を入力してください。' }}</p>
-          </div>
-          
-          <form @submit.prevent="handleSubmit" class="form">
-            <div class="form-group">
-              <label for="name" class="form-label">
-                事業者名 <span class="required">*</span>
-              </label>
-              <input
-                id="name"
-                v-model="formData.name"
-                type="text"
-                class="form-input"
-                :class="{ 'error': errors.name }"
-                placeholder="例: 株式会社サンプル"
-                required
-              />
-              <div v-if="errors.name" class="error-message">{{ errors.name }}</div>
-            </div>
-            
-            <div class="form-group">
-              <label for="number" class="form-label">
-                事業者番号 <span class="required">*</span>
-              </label>
-              <input
-                id="number"
-                v-model="formData.number"
-                type="text"
-                class="form-input"
-                :class="{ 'error': errors.number }"
-                placeholder="例: T1234567890123"
-                required
-              />
-              <div class="form-hint">Tから始まる番号を入力してください</div>
-              <div v-if="errors.number" class="error-message">{{ errors.number }}</div>
-            </div>
-            
-            <div class="form-group">
-              <label for="representative" class="form-label">
-                代表者名 <span class="required">*</span>
-              </label>
-              <input
-                id="representative"
-                v-model="formData.representative"
-                type="text"
-                class="form-input"
-                :class="{ 'error': errors.representative }"
-                placeholder="例: 山田太郎"
-                required
-              />
-              <div v-if="errors.representative" class="error-message">{{ errors.representative }}</div>
-            </div>
-            
-            <div class="form-group">
-              <label for="bankInfo" class="form-label">
-                振込先情報
-              </label>
-              <textarea
-                id="bankInfo"
-                v-model="formData.bankInfo"
-                class="form-textarea"
-                :class="{ 'error': errors.bankInfo }"
-                placeholder="例: 〇〇銀行 〇〇支店 普通 1234567 株式会社サンプル"
-                rows="3"
-              ></textarea>
-              <div v-if="errors.bankInfo" class="error-message">{{ errors.bankInfo }}</div>
-            </div>
-            
-            <div class="form-group">
-              <label for="phone" class="form-label">
-                電話番号
-              </label>
-              <input
-                id="phone"
-                v-model="formData.phone"
-                type="tel"
-                class="form-input"
-                :class="{ 'error': errors.phone }"
-                placeholder="例: 03-1234-5678"
-              />
-              <div v-if="errors.phone" class="error-message">{{ errors.phone }}</div>
-            </div>
-            
-            <div class="form-group">
-              <label for="address" class="form-label">
-                住所
-              </label>
-              <textarea
-                id="address"
-                v-model="formData.address"
-                class="form-textarea"
-                :class="{ 'error': errors.address }"
-                placeholder="例: 〒100-0001 東京都千代田区千代田1-1-1"
-                rows="3"
-              ></textarea>
-              <div v-if="errors.address" class="error-message">{{ errors.address }}</div>
-            </div>
-            
-            <div class="form-actions">
-              <button
-                type="button"
-                @click="handleCancel"
-                class="btn btn-secondary"
-                :disabled="settingsStore.isLoading"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                class="btn btn-primary"
-                :disabled="settingsStore.isLoading"
-              >
-                <span v-if="settingsStore.isLoading" class="loading-spinner"></span>
-                {{ isEditMode ? '更新' : '作成' }}
-              </button>
-            </div>
-          </form>
-          
-          <div v-if="settingsStore.error" class="error-alert">
-            {{ settingsStore.error }}
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup>
@@ -151,6 +135,7 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
+import AppLayout from '../components/AppLayout.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -282,38 +267,6 @@ const handleSignOut = async () => {
 .business-settings {
   min-height: 100vh;
   background-color: #f5f5f5;
-}
-
-.header {
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 1rem 0;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header h1 {
-  color: #333;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.user-info span {
-  color: #666;
-}
-
-.main {
-  padding: 2rem 0;
 }
 
 .settings-form {
@@ -465,11 +418,6 @@ const handleSignOut = async () => {
 }
 
 @media (max-width: 768px) {
-  .header-content {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
   .settings-form {
     margin: 0 1rem;
     padding: 1.5rem;

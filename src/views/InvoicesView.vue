@@ -1,29 +1,17 @@
 <template>
-  <div class="invoices">
-    <header class="header">
-      <div class="container">
-        <div class="header-content">
-          <h1>請求書管理</h1>
-          <router-link to="/dashboard" class="btn btn-secondary">
-            ダッシュボードに戻る
-          </router-link>
-        </div>
+  <AppLayout>
+    <div class="invoices">
+      <div class="card">
+        <h2>請求書一覧</h2>
+        <p>この機能は現在開発中です。</p>
+        <p>Google Drive APIとの連携により、請求書の作成・管理が可能になります。</p>
       </div>
-    </header>
-    
-    <main class="main">
-      <div class="container">
-        <div class="card">
-          <h2>請求書一覧</h2>
-          <p>この機能は現在開発中です。</p>
-          <p>Google Drive APIとの連携により、請求書の作成・管理が可能になります。</p>
-        </div>
-      </div>
-    </main>
-  </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup>
+import AppLayout from '../components/AppLayout.vue'
 // 請求書管理機能は後で実装
 </script>
 
@@ -33,26 +21,12 @@
   background-color: #f5f5f5;
 }
 
-.header {
+.card {
   background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 1rem 0;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header h1 {
-  color: #333;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.main {
-  padding: 2rem 0;
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .card h2 {

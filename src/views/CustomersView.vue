@@ -1,26 +1,17 @@
 <template>
-  <div class="customers">
-    <header class="header">
-      <div class="container">
-        <div class="header-content">
-          <h1>顧客管理</h1>
-          <div class="header-actions">
-            <button @click="showCreateForm" class="btn btn-primary">
-              ＋ 新規顧客
-            </button>
-            <router-link to="/dashboard" class="btn btn-secondary">
-              ダッシュボードに戻る
-            </router-link>
-          </div>
-        </div>
+  <AppLayout>
+    <div class="customers-header">
+      <h1>顧客管理</h1>
+      <div class="header-actions">
+        <button @click="showCreateForm" class="btn btn-primary">
+          ＋ 新規顧客
+        </button>
       </div>
-    </header>
+    </div>
     
-    <main class="main">
-      <div class="container">
-        <div class="content-wrapper">
-          <!-- 顧客一覧 -->
-          <div class="list-section">
+    <div class="content-wrapper">
+      <!-- 顧客一覧 -->
+      <div class="list-section">
             <CustomerList
               :customers="customersStore.customers"
               :is-loading="customersStore.isLoading"
@@ -96,16 +87,14 @@
                 </button>
               </div>
             </div>
-          </div>
-        </div>
       </div>
-    </main>
+    </div>
+  </AppLayout>
     
     <!-- 成功メッセージ -->
     <div v-if="successMessage" class="success-toast">
       {{ successMessage }}
     </div>
-  </div>
 </template>
 
 <script setup>
@@ -114,6 +103,7 @@ import { useCustomersStore } from '../stores/customers'
 import CustomerList from '../components/CustomerList.vue'
 import CustomerForm from '../components/CustomerForm.vue'
 import CustomerBulkCreate from '../components/CustomerBulkCreate.vue'
+import AppLayout from '../components/AppLayout.vue'
 
 const customersStore = useCustomersStore()
 
@@ -270,24 +260,14 @@ const formatDate = (dateString) => {
 </script>
 
 <style scoped>
-.customers {
-  min-height: 100vh;
-  background-color: #f5f5f5;
-}
-
-.header {
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 1rem 0;
-}
-
-.header-content {
+.customers-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 2rem;
 }
 
-.header h1 {
+.customers-header h1 {
   color: #333;
   font-size: 1.5rem;
   font-weight: 600;
@@ -297,10 +277,6 @@ const formatDate = (dateString) => {
 .header-actions {
   display: flex;
   gap: 10px;
-}
-
-.main {
-  padding: 2rem 0;
 }
 
 .content-wrapper {

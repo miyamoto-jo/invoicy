@@ -1,51 +1,38 @@
 <template>
-  <div class="sales">
-    <header class="header">
-      <div class="container">
-        <div class="header-content">
-          <h1>売上管理</h1>
-          <router-link to="/dashboard" class="btn btn-secondary">
-            ダッシュボードに戻る
-          </router-link>
-        </div>
+  <AppLayout>
+    <div class="sales">
+      <!-- 売上登録 -->
+      <div class="card">
+        <h2>売上登録</h2>
+        <p class="description">
+          顧客を選択し、商品と数量を入力して売上伝票を作成します。
+        </p>
+        
+        <SalesForm 
+          ref="salesFormRef"
+          @submit="handleSaleCreated"
+          @cancel="handleCancel"
+          @error="handleError"
+          @toast="handleToast"
+        />
       </div>
-    </header>
-    
-    <main class="main">
-      <div class="container">
-        <!-- 売上登録 -->
-        <div class="card">
-          <h2>売上登録</h2>
-          <p class="description">
-            顧客を選択し、商品と数量を入力して売上伝票を作成します。
-          </p>
-          
-          <SalesForm 
-            ref="salesFormRef"
-            @submit="handleSaleCreated"
-            @cancel="handleCancel"
-            @error="handleError"
-            @toast="handleToast"
-          />
-        </div>
 
-        <!-- 成功メッセージ -->
-        <div v-if="showSuccessMessage" class="success-message">
-          <div class="success-content">
-            <h3>売上登録完了</h3>
-            <p>売上伝票が正常に登録されました。</p>
-            <div class="success-actions">
-              <button @click="handleReregister" class="btn btn-success">
-                再登録
-              </button>
-              <router-link to="/dashboard" class="btn btn-secondary">
-                ダッシュボードに戻る
-              </router-link>
-            </div>
+      <!-- 成功メッセージ -->
+      <div v-if="showSuccessMessage" class="success-message">
+        <div class="success-content">
+          <h3>売上登録完了</h3>
+          <p>売上伝票が正常に登録されました。</p>
+          <div class="success-actions">
+            <button @click="handleReregister" class="btn btn-success">
+              再登録
+            </button>
+            <router-link to="/dashboard" class="btn btn-secondary">
+              ダッシュボードに戻る
+            </router-link>
           </div>
         </div>
       </div>
-    </main>
+    </div>
 
     <!-- トースト通知 -->
     <div v-if="toast.show" class="toast" :class="toast.type">
@@ -54,13 +41,14 @@
         <button @click="hideToast" class="toast-close">&times;</button>
       </div>
     </div>
-  </div>
+  </AppLayout>
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import SalesForm from '../components/SalesForm.vue'
+import AppLayout from '../components/AppLayout.vue'
 
 const router = useRouter()
 
@@ -127,36 +115,12 @@ const hideToast = () => {
   background-color: #f5f5f5;
 }
 
-.header {
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 1rem 0;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header h1 {
-  color: #333;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.main {
-  padding: 2rem 0;
-}
-
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
 .card {
+  background: white;
+  border-radius: 8px;
   padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .card h2 {

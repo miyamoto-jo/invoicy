@@ -4,12 +4,6 @@
       <div class="container">
         <div class="header-content">
           <h1>Invoicy</h1>
-          <div class="user-info">
-            <span>{{ authStore.userName }}</span>
-            <button @click="handleSignOut" class="btn btn-secondary">
-              サインアウト
-            </button>
-          </div>
         </div>
       </div>
     </header>
@@ -158,10 +152,7 @@ onMounted(async () => {
   }
 })
 
-const handleSignOut = async () => {
-  authStore.signOut()
-  router.push('/')
-}
+
 </script>
 
 <style scoped>
@@ -188,15 +179,7 @@ const handleSignOut = async () => {
   font-weight: 600;
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
 
-.user-info span {
-  color: #666;
-}
 
 .main {
   padding: 2rem 0;

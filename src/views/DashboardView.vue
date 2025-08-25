@@ -123,21 +123,36 @@ const router = useRouter()
 const refreshTrigger = ref(0)
 
 onMounted(async () => {
-  // 設定データを初期化
   try {
+    // 認証状態の確認
+    if (!authStore.isAuthenticated) {
+      console.log('❌ User not authenticated, redirecting to login')
+      router.push('/')
+      return
+    }
+    
+    console.log('✅ User authenticated, initializing data...')
+    
+    // 設定データを初期化
     await settingsStore.initializeSettings()
     
     // 事業者設定が存在しない場合は設定画面にリダイレクト
     if (!settingsStore.hasBusinessSettings) {
+      console.log('❌ No business settings found, redirecting to setup')
       router.push('/business-settings')
       return
     }
+    
+    console.log('✅ Business settings loaded')
     
     // 顧客データと税率データを初期化
     await Promise.all([
       customersStore.initializeCustomers(),
       taxesStore.initializeTaxes()
     ])
+    
+    console.log('✅ All data initialized successfully')
+    
   } catch (err) {
     console.error('Failed to initialize data:', err)
   }

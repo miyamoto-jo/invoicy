@@ -59,13 +59,26 @@ export const useCustomersStore = defineStore('customers', () => {
         for (const line of lines) {
           if (line.trim()) {
             try {
-              parsedCustomers.push(JSON.parse(line))
+              const customer = JSON.parse(line)
+              // 必要な情報のみを抽出
+              const essentialCustomer = {
+                id: customer.id,
+                name: customer.name,
+                closingDay: customer.closingDay,
+                paymentMethod: customer.paymentMethod,
+                alias: customer.alias,
+                address: customer.address,
+                createdAt: customer.createdAt,
+                updatedAt: customer.updatedAt
+              }
+              parsedCustomers.push(essentialCustomer)
             } catch (err) {
               console.warn('Invalid JSON line in customers.jsonl:', line, err)
             }
           }
         }
         customers.value = parsedCustomers
+        
       } else {
         customers.value = []
       }
@@ -108,13 +121,27 @@ export const useCustomersStore = defineStore('customers', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // ローカル状態を更新
-      customers.value.push(newCustomer)
+      // 必要な情報のみを抽出
+      const essentialCustomer = {
+        id: newCustomer.id,
+        name: newCustomer.name,
+        closingDay: newCustomer.closingDay,
+        paymentMethod: newCustomer.paymentMethod,
+        alias: newCustomer.alias,
+        address: newCustomer.address,
+        createdAt: newCustomer.createdAt,
+        updatedAt: newCustomer.updatedAt
+      }
+      
+      // ローカル状態に追加
+      customers.value.push(essentialCustomer)
       
       // ファイルを更新
       await saveCustomersToFile(token)
       
-      return newCustomer
+      console.log('Customer created successfully:', essentialCustomer)
+      
+      return essentialCustomer
       
     } catch (err) {
       console.error('Failed to create customer:', err)
@@ -180,9 +207,21 @@ export const useCustomersStore = defineStore('customers', () => {
             updatedAt: new Date().toISOString()
           }
           
-          // ローカル状態を更新
-          customers.value.push(newCustomer)
-          createdCustomers.push(newCustomer)
+          // 必要な情報のみを抽出
+          const essentialCustomer = {
+            id: newCustomer.id,
+            name: newCustomer.name,
+            closingDay: newCustomer.closingDay,
+            paymentMethod: newCustomer.paymentMethod,
+            alias: newCustomer.alias,
+            address: newCustomer.address,
+            createdAt: newCustomer.createdAt,
+            updatedAt: newCustomer.updatedAt
+          }
+          
+          // ローカル状態に追加
+          customers.value.push(essentialCustomer)
+          createdCustomers.push(essentialCustomer)
           
         } catch (err) {
           console.error(`Failed to create customer ${customerData.name}:`, err)
@@ -220,25 +259,16 @@ export const useCustomersStore = defineStore('customers', () => {
       if (!customerData.name || customerData.name.trim() === '') {
         throw new Error('顧客名は必須です')
       }
-      if (!customerData.closingDay) {
-        throw new Error('締め日は必須です')
-      }
-      if (customerData.closingDay !== '末日' && (customerData.closingDay < 1 || customerData.closingDay > 31)) {
-        throw new Error('締め日は1〜31の範囲または末日で入力してください')
-      }
-      if (!customerData.paymentMethod) {
-        throw new Error('お支払い方法は必須です')
-      }
       
       // 既存の顧客を検索
-      const existingCustomer = customers.value.find(c => c.id === customerId)
-      if (!existingCustomer) {
+      const customerIndex = customers.value.findIndex(c => c.id === customerId)
+      if (customerIndex === -1) {
         throw new Error('顧客が見つかりません')
       }
       
-      // 顧客データの更新
+      // 顧客データを更新
       const updatedCustomer = {
-        ...existingCustomer,
+        ...customers.value[customerIndex],
         name: customerData.name.trim(),
         alias: customerData.alias?.trim() || '',
         address: customerData.address?.trim() || '',
@@ -247,16 +277,27 @@ export const useCustomersStore = defineStore('customers', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // ローカル状態を更新
-      const index = customers.value.findIndex(c => c.id === customerId)
-      if (index !== -1) {
-        customers.value[index] = updatedCustomer
+      // 必要な情報のみを抽出
+      const essentialCustomer = {
+        id: updatedCustomer.id,
+        name: updatedCustomer.name,
+        closingDay: updatedCustomer.closingDay,
+        paymentMethod: updatedCustomer.paymentMethod,
+        alias: updatedCustomer.alias,
+        address: updatedCustomer.address,
+        createdAt: updatedCustomer.createdAt,
+        updatedAt: updatedCustomer.updatedAt
       }
+      
+      // ローカル状態を更新
+      customers.value[customerIndex] = essentialCustomer
       
       // ファイルを更新
       await saveCustomersToFile(token)
       
-      return updatedCustomer
+      console.log('Customer updated successfully:', essentialCustomer)
+      
+      return essentialCustomer
       
     } catch (err) {
       console.error('Failed to update customer:', err)
@@ -280,19 +321,18 @@ export const useCustomersStore = defineStore('customers', () => {
       }
       
       // 既存の顧客を検索
-      const existingCustomer = customers.value.find(c => c.id === customerId)
-      if (!existingCustomer) {
+      const customerIndex = customers.value.findIndex(c => c.id === customerId)
+      if (customerIndex === -1) {
         throw new Error('顧客が見つかりません')
       }
       
-      // ローカル状態を更新
-      const index = customers.value.findIndex(c => c.id === customerId)
-      if (index !== -1) {
-        customers.value.splice(index, 1)
-      }
+      // ローカル状態から削除
+      customers.value.splice(customerIndex, 1)
       
       // ファイルを更新
       await saveCustomersToFile(token)
+      
+      console.log('Customer deleted successfully')
       
     } catch (err) {
       console.error('Failed to delete customer:', err)

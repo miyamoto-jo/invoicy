@@ -25,6 +25,15 @@ export const useSettingsStore = defineStore('settings', () => {
         throw new Error('認証トークンがありません')
       }
       
+      // ローカルストレージから事業者設定を確認
+      const cachedSettings = authStore.loadFromLocalStorage(authStore.STORAGE_KEYS.BUSINESS_SETTINGS)
+      if (cachedSettings) {
+        console.log('✅ Using cached business settings from localStorage')
+        businessSettings.value = cachedSettings
+        return
+      }
+      
+      console.log('📡 Fetching business settings from API')
       // setting.jsonファイルの存在確認と取得
       await loadSettingsFile(token)
       
@@ -87,10 +96,26 @@ export const useSettingsStore = defineStore('settings', () => {
       
       const settingsData = await response.json()
       
-      // 事業者設定を直接設定
-      businessSettings.value = settingsData || null
+      // 必要な情報のみを抽出
+      const essentialSettings = {
+        name: settingsData.name,
+        representative: settingsData.representative,
+        number: settingsData.number,
+        bankInfo: settingsData.bankInfo,
+        phone: settingsData.phone,
+        address: settingsData.address,
+        createdAt: settingsData.createdAt,
+        updatedAt: settingsData.updatedAt
+      }
       
-      console.log('Settings loaded successfully:', businessSettings.value)
+      // 事業者設定を直接設定
+      businessSettings.value = essentialSettings || null
+      
+      // ローカルストレージに保存
+      const authStore = useAuthStore()
+      authStore.saveToLocalStorage(authStore.STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
+      
+      console.log('Settings loaded successfully and cached:', businessSettings.value)
       
     } catch (err) {
       console.error('Failed to load settings from file:', err)
@@ -119,6 +144,24 @@ export const useSettingsStore = defineStore('settings', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
+      
+      // 必要な情報のみを抽出
+      const essentialSettings = {
+        name: settingsData.name,
+        representative: settingsData.representative,
+        number: settingsData.number,
+        bankInfo: settingsData.bankInfo,
+        phone: settingsData.phone,
+        address: settingsData.address,
+        createdAt: settingsData.createdAt,
+        updatedAt: settingsData.updatedAt
+      }
+      
+      // ローカルストレージに保存
+      authStore.saveToLocalStorage(authStore.STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
+      
+      // 事業者設定を設定
+      businessSettings.value = essentialSettings
       
       // setting.jsonファイルを作成
       const appFolder = await authStore.getAppFolderId()
@@ -162,8 +205,7 @@ export const useSettingsStore = defineStore('settings', () => {
         throw new Error(`設定ファイルの内容更新に失敗しました: ${updateContentResponse.status} ${updateContentResponse.statusText}`)
       }
       
-      // 状態を更新
-      businessSettings.value = settingsData
+      console.log('Business settings created successfully and cached')
       
       return createdFile
       

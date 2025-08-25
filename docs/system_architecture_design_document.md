@@ -62,6 +62,23 @@
 
 ### 3.3 JSON スキーマ（最小）
 
+**設定（setting.json）**
+
+```json
+{
+    "name": "事業者名",
+    "number": "T1234567890123",
+    "representative": "代表者名",
+    "bankInfo": "振込先情報",
+    "phone": "電話番号",
+    "address": "住所",
+    "createdAt": "2025-08-16T12:34:56+09:00",
+    "updatedAt": "2025-08-16T12:34:56+09:00"
+}
+```
+
+> **business**: 事業者設定情報
+
 **顧客マスター（masters/customers.jsonl）**
 
 ```jsonl
@@ -89,23 +106,6 @@
   "lastUpdated": "2025-08-16T12:34:56+09:00"
 }
 ```
-
-**設定（setting.json）**
-
-```json
-{
-    "name": "事業者名",
-    "number": "T1234567890123",
-    "representative": "代表者名",
-    "bankInfo": "振込先情報",
-    "phone": "電話番号",
-    "address": "住所",
-    "createdAt": "2025-08-16T12:34:56+09:00",
-    "updatedAt": "2025-08-16T12:34:56+09:00"
-}
-```
-
-> **business**: 事業者設定情報
 
 **月次台帳（sales/ledger-YYYYMM.jsonl）**
 

@@ -29,9 +29,46 @@ export const useAuthStore = defineStore('auth', () => {
     'sales'
   ]
   
+  // Local storage keys
+  const STORAGE_KEYS = {
+    USER_INFO: 'invoicy_user_info',
+    BUSINESS_SETTINGS: 'invoicy_business_settings'
+  }
+  
   // Computed
   const userEmail = computed(() => user.value?.email || '')
   const userName = computed(() => user.value?.name || '')
+  
+  // Local storage utilities
+  const saveToLocalStorage = (key, data) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data))
+      console.log(`💾 Saved to localStorage: ${key}`)
+    } catch (err) {
+      console.error(`Failed to save to localStorage: ${key}`, err)
+    }
+  }
+  
+  const loadFromLocalStorage = (key) => {
+    try {
+      const data = localStorage.getItem(key)
+      return data ? JSON.parse(data) : null
+    } catch (err) {
+      console.error(`Failed to load from localStorage: ${key}`, err)
+      return null
+    }
+  }
+  
+  const clearLocalStorage = () => {
+    try {
+      Object.values(STORAGE_KEYS).forEach(key => {
+        localStorage.removeItem(key)
+      })
+      console.log('🧹 Cleared all invoicy data from localStorage')
+    } catch (err) {
+      console.error('Failed to clear localStorage', err)
+    }
+  }
   
   // Actions
   const initializeAuth = async () => {
@@ -92,9 +129,17 @@ export const useAuthStore = defineStore('auth', () => {
         // トークンの有効性を確認
         const isValid = await validateToken(token)
         if (isValid) {
-          await fetchUserInfo(token)
-          // アプリフォルダの確認・作成は初回ログイン時のみ行うため、ここでは実行しない
-          console.log('✅ Existing token is valid, skipping app folder creation')
+          // ローカルストレージからユーザー情報を確認
+          const cachedUserInfo = loadFromLocalStorage(STORAGE_KEYS.USER_INFO)
+          if (cachedUserInfo) {
+            console.log('✅ Using cached user info from localStorage')
+            user.value = cachedUserInfo
+            isAuthenticated.value = true
+            error.value = null
+          } else {
+            console.log('📡 Fetching user info from API')
+            await fetchUserInfo(token)
+          }
           return
         }
       }
@@ -165,10 +210,25 @@ export const useAuthStore = defineStore('auth', () => {
       if (response.ok) {
         const userInfo = await response.json()
         console.log('📄 User info response data:', userInfo)
-        user.value = userInfo
+        
+        // 必要な情報のみを抽出
+        const essentialUserInfo = {
+          id: userInfo.id,
+          email: userInfo.email,
+          name: userInfo.name,
+          picture: userInfo.picture,
+          given_name: userInfo.given_name,
+          family_name: userInfo.family_name
+        }
+        
+        user.value = essentialUserInfo
         isAuthenticated.value = true
         error.value = null
-        console.log('✅ User info set successfully')
+        
+        // ローカルストレージに保存
+        saveToLocalStorage(STORAGE_KEYS.USER_INFO, essentialUserInfo)
+        
+        console.log('✅ User info set successfully and cached')
       } else {
         const errorText = await response.text()
         console.error('❌ User info response error:', {
@@ -278,6 +338,9 @@ export const useAuthStore = defineStore('auth', () => {
       for (const folderName of SUB_FOLDERS) {
         localStorage.removeItem(`invoicy_${folderName}_folder_id`)
       }
+      
+      // アプリデータをローカルストレージから削除
+      clearLocalStorage()
       
       // Google Identity Servicesのサインアウト
       if (window.google && window.google.accounts) {
@@ -665,6 +728,12 @@ export const useAuthStore = defineStore('auth', () => {
     getAccessToken,
     ensureAppFolder,
     getAppFolderId,
-    getSubFolderId
+    getSubFolderId,
+    
+    // Local storage utilities
+    saveToLocalStorage,
+    loadFromLocalStorage,
+    clearLocalStorage,
+    STORAGE_KEYS
   }
 }) 

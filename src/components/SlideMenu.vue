@@ -36,6 +36,14 @@
       
       <!-- メニュー項目 -->
       <nav class="menu-items">
+        <!-- ダッシュボード -->
+        <div class="menu-section">
+          <router-link to="/dashboard" class="menu-item" @click="closeMenu">
+            <div class="menu-icon dashboard-icon">🏠</div>
+            <span class="menu-text">ダッシュボード</span>
+          </router-link>
+        </div>
+        
         <!-- 業務セクション -->
         <div class="menu-section">
           <h3 class="section-title">業務</h3>
@@ -70,11 +78,11 @@
         <div class="menu-section">
           <h3 class="section-title">その他</h3>
           <router-link to="/business-settings" class="menu-item" @click="closeMenu">
-            <div class="menu-icon settings-icon">😰</div>
+            <div class="menu-icon settings-icon">🏢</div>
             <span class="menu-text">事業者設定</span>
           </router-link>
           <button class="menu-item signout-button" @click="handleSignOut">
-            <div class="menu-icon signout-icon">🗑️</div>
+            <div class="menu-icon signout-icon">👋</div>
             <span class="menu-text">サインアウト</span>
           </button>
         </div>
@@ -277,6 +285,10 @@ const handleSignOut = async () => {
 }
 
 /* アイコンカラー */
+.dashboard-icon {
+  color: #4caf50;
+}
+
 .sales-icon {
   color: #f57c00;
 }

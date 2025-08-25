@@ -81,17 +81,39 @@
             <div class="menu-icon settings-icon">🏢</div>
             <span class="menu-text">事業者設定</span>
           </router-link>
-          <button class="menu-item signout-button" @click="handleSignOut">
+          <button class="menu-item signout-button" @click="showSignOutModal">
             <div class="menu-icon signout-icon">👋</div>
             <span class="menu-text">サインアウト</span>
           </button>
         </div>
       </nav>
     </div>
+
+    <!-- サインアウト確認モーダル -->
+    <div v-if="showModal" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">サインアウト確認</h3>
+        </div>
+        <div class="modal-body">
+          <p>本当にサインアウトしますか？</p>
+          <p class="modal-subtitle">ログイン画面に戻ります。</p>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-button cancel-button" @click="closeModal">
+            キャンセル
+          </button>
+          <button class="modal-button confirm-button" @click="confirmSignOut">
+            サインアウト
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
+import { ref, watch, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { useRouter } from 'vue-router'
@@ -109,19 +131,57 @@ const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const router = useRouter()
 
+const showModal = ref(false)
+
+// スクロール制御関数
+const disableScroll = () => {
+  document.body.style.overflow = 'hidden'
+  document.body.style.position = 'fixed'
+  document.body.style.width = '100%'
+}
+
+const enableScroll = () => {
+  document.body.style.overflow = ''
+  document.body.style.position = ''
+  document.body.style.width = ''
+}
+
+// モーダルの表示状態を監視してスクロールを制御
+watch(showModal, (newValue) => {
+  if (newValue) {
+    disableScroll()
+  } else {
+    enableScroll()
+  }
+})
+
 const closeMenu = () => {
   emit('close')
 }
 
-const handleSignOut = async () => {
+const showSignOutModal = () => {
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+}
+
+const confirmSignOut = async () => {
   try {
     await authStore.signOut()
+    closeModal()
     closeMenu()
     router.push('/')
   } catch (error) {
     console.error('Sign out failed:', error)
   }
 }
+
+// コンポーネントがアンマウントされる時にスクロールを有効に戻す
+onUnmounted(() => {
+  enableScroll()
+})
 </script>
 
 <style scoped>
@@ -367,5 +427,151 @@ const handleSignOut = async () => {
 
 .slide-menu::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* モーダルスタイル */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.25s ease-out;
+  pointer-events: auto;
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: slideIn 0.25s ease-out;
+  pointer-events: auto;
+}
+
+.modal-header {
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-body p {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  color: #333;
+  line-height: 1.5;
+}
+
+.modal-subtitle {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.modal-button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.cancel-button {
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.cancel-button:hover {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.confirm-button {
+  background-color: #f44336;
+  color: white;
+}
+
+.confirm-button:hover {
+  background-color: #d32f2f;
+}
+
+/* モーダルアニメーション */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .slide-menu {
+    width: 280px;
+    left: -280px;
+  }
+  
+  .slide-menu.menu-open {
+    transform: translateX(280px);
+  }
+  
+  .user-section {
+    padding: 1.5rem 1rem;
+  }
+  
+  .menu-item {
+    padding: 0.75rem 1rem;
+  }
+  
+  .section-title {
+    padding: 0 1rem;
+  }
+
+  .modal-content {
+    width: 95%;
+    margin: 1rem;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+
+  .modal-button {
+    width: 100%;
+  }
 }
 </style>

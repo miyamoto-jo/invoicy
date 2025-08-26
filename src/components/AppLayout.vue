@@ -58,11 +58,6 @@ const closeMenu = () => {
 .app-layout {
   min-height: 100vh;
   background-color: #f5f5f5;
-  transition: filter 0.25s ease;
-}
-
-.app-layout.menu-open {
-  filter: brightness(0.7);
 }
 
 .header {

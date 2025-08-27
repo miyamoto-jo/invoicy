@@ -135,11 +135,16 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
+import { useLoading } from '../composables/useLoading'
 import AppLayout from '../components/AppLayout.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
+const { setLoading, clearLoading } = useLoading()
+
+// 初期化完了フラグ
+const isInitialized = ref(false)
 
 // フォームデータ
 const formData = reactive({
@@ -166,21 +171,40 @@ const isEditMode = computed(() => settingsStore.hasBusinessSettings)
 
 onMounted(async () => {
   try {
-    // 設定の初期化
-    await settingsStore.initializeSettings()
-    
-    // 編集モードの場合は既存データをフォームに設定
-    if (isEditMode.value && settingsStore.businessSettings) {
-      const business = settingsStore.businessSettings
-      formData.name = business.name || ''
-      formData.number = business.number || ''
-      formData.representative = business.representative || ''
-      formData.bankInfo = business.bankInfo || ''
-      formData.phone = business.phone || ''
-      formData.address = business.address || ''
+    // 設定が既に初期化されているかチェック
+    if (!settingsStore.isInitialized) {
+      // ローディング開始
+      setLoading(true, '設定を確認中...', '事業者設定を読み込んでいます')
+      
+      // 設定の初期化
+      await settingsStore.initializeSettings()
+      
+      // ローディング終了
+      clearLoading()
     }
+    
+    // 設定が存在しない場合は初回設定モード
+    if (!settingsStore.hasBusinessSettings) {
+      console.log('❌ No business settings found, staying on settings page for initial setup')
+    } else {
+      console.log('✅ Business settings found, loading for editing')
+      // 編集モードの場合は既存データをフォームに設定
+      if (settingsStore.businessSettings) {
+        const business = settingsStore.businessSettings
+        formData.name = business.name || ''
+        formData.number = business.number || ''
+        formData.representative = business.representative || ''
+        formData.bankInfo = business.bankInfo || ''
+        formData.phone = business.phone || ''
+        formData.address = business.address || ''
+      }
+    }
+    
+    isInitialized.value = true
+    
   } catch (err) {
     console.error('Failed to initialize settings:', err)
+    clearLoading()
   }
 })
 
@@ -222,6 +246,9 @@ const handleSubmit = async () => {
   }
   
   try {
+    // ローディング開始
+    setLoading(true, '保存中...', '事業者設定を保存しています')
+    
     const businessData = {
       name: formData.name.trim(),
       number: formData.number.trim(),
@@ -238,27 +265,31 @@ const handleSubmit = async () => {
     }
     
     // 成功時はダッシュボードにリダイレクト
+    console.log('✅ Business settings saved successfully, redirecting to dashboard')
     router.push('/dashboard')
     
   } catch (err) {
     console.error('Failed to save business settings:', err)
     // エラーはストアで管理されているため、ここでは何もしない
+  } finally {
+    // ローディング終了
+    clearLoading()
   }
 }
 
-const handleCancel = () => {
+const handleCancel = async () => {
   if (isEditMode.value) {
     // 編集モードの場合はダッシュボードに戻る
     router.push('/dashboard')
   } else {
     // 作成モードの場合はログアウト
-    authStore.signOut()
+    await authStore.signOut()
     router.push('/')
   }
 }
 
 const handleSignOut = async () => {
-  authStore.signOut()
+  await authStore.signOut()
   router.push('/')
 }
 </script>

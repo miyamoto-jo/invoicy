@@ -7,13 +7,19 @@ export const useSettingsStore = defineStore('settings', () => {
   const businessSettings = ref(null)
   const isLoading = ref(false)
   const error = ref(null)
+  const isInitialized = ref(false) // 初期化完了フラグを追加
   
   // Computed
   const hasBusinessSettings = computed(() => !!businessSettings.value)
-  const isInitialized = computed(() => businessSettings.value !== null)
   
   // Actions
   const initializeSettings = async () => {
+    // 既に初期化済みの場合はスキップ
+    if (isInitialized.value) {
+      console.log('✅ Settings already initialized, skipping...')
+      return
+    }
+    
     try {
       isLoading.value = true
       error.value = null
@@ -30,6 +36,7 @@ export const useSettingsStore = defineStore('settings', () => {
       if (cachedSettings) {
         console.log('✅ Using cached business settings from localStorage')
         businessSettings.value = cachedSettings
+        isInitialized.value = true
         return
       }
       
@@ -37,11 +44,14 @@ export const useSettingsStore = defineStore('settings', () => {
       // setting.jsonファイルの存在確認と取得
       await loadSettingsFile(token)
       
+      isInitialized.value = true
+      
     } catch (err) {
       console.error('Settings initialization failed:', err)
       error.value = '設定の初期化に失敗しました'
       // エラーの場合はnullに設定（初回設定画面を表示するため）
       businessSettings.value = null
+      isInitialized.value = true
     } finally {
       isLoading.value = false
     }
@@ -50,7 +60,23 @@ export const useSettingsStore = defineStore('settings', () => {
   const loadSettingsFile = async (token) => {
     try {
       const authStore = useAuthStore()
-      const appFolder = await authStore.getAppFolderId()
+      
+      // アプリフォルダの取得または作成
+      let appFolder
+      try {
+        console.log('🔍 Trying to get existing app folder...')
+        appFolder = await authStore.getAppFolderId()
+        console.log('✅ Found existing app folder:', appFolder.id)
+      } catch (err) {
+        console.log('❌ App folder not found, creating new one...', err.message)
+        try {
+          appFolder = await authStore.ensureAppFolder(token)
+          console.log('✅ Created new app folder:', appFolder.id)
+        } catch (createErr) {
+          console.error('❌ Failed to create app folder:', createErr)
+          throw new Error(`アプリフォルダの作成に失敗しました: ${createErr.message}`)
+        }
+      }
       
       // setting.jsonファイルを検索
       const searchQuery = `name='setting.json' and '${appFolder.id}' in parents and trashed=false`
@@ -164,7 +190,7 @@ export const useSettingsStore = defineStore('settings', () => {
       businessSettings.value = essentialSettings
       
       // setting.jsonファイルを作成
-      const appFolder = await authStore.getAppFolderId()
+      const appFolder = await authStore.ensureAppFolder(token)
       
       const createPayload = {
         name: 'setting.json',
@@ -234,7 +260,7 @@ export const useSettingsStore = defineStore('settings', () => {
       validateBusinessSettings(businessData)
       
       // 既存の設定ファイルを検索
-      const appFolder = await authStore.getAppFolderId()
+      const appFolder = await authStore.ensureAppFolder(token)
       const searchQuery = `name='setting.json' and '${appFolder.id}' in parents and trashed=false`
       const searchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name)`, {
         headers: {
@@ -316,6 +342,14 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
   
+  const resetSettings = () => {
+    businessSettings.value = null
+    isLoading.value = false
+    error.value = null
+    isInitialized.value = false
+    console.log('🔄 Settings store reset')
+  }
+  
 
   
   return {
@@ -323,14 +357,15 @@ export const useSettingsStore = defineStore('settings', () => {
     businessSettings,
     isLoading,
     error,
+    isInitialized, // 初期化完了フラグをエクスポート
     
     // Computed
     hasBusinessSettings,
-    isInitialized,
     
     // Actions
     initializeSettings,
     createBusinessSettings,
-    updateBusinessSettings
+    updateBusinessSettings,
+    resetSettings
   }
 }) 

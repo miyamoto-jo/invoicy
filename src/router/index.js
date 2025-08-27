@@ -77,29 +77,8 @@ router.beforeEach(async (to, from, next) => {
   } else if (to.name === 'login' && authStore.isAuthenticated) {
     // 認証済みでログインページにアクセスした場合
     next('/dashboard')
-  } else if (to.meta.requiresAuth && authStore.isAuthenticated) {
-    // 認証済みでダッシュボードにアクセスする場合、事業者設定の確認
-    if (to.name === 'dashboard') {
-      try {
-        // 設定ストアを動的にインポート
-        const { useSettingsStore } = await import('../stores/settings')
-        const settingsStore = useSettingsStore()
-        
-        // 設定の初期化
-        await settingsStore.initializeSettings()
-        
-        // 事業者設定が存在しない場合は設定画面にリダイレクト
-        if (!settingsStore.hasBusinessSettings) {
-          next('/business-settings')
-          return
-        }
-      } catch (err) {
-        console.error('Failed to check business settings:', err)
-        // エラーの場合はダッシュボードに進む
-      }
-    }
-    next()
   } else {
+    // その他の場合は通常通り進む
     next()
   }
 })

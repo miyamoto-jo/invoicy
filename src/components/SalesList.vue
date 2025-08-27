@@ -64,15 +64,12 @@
           <button 
             @click="searchSales" 
             class="btn btn-primary"
-            :disabled="isLoading"
           >
-            <span v-if="isLoading">検索中...</span>
-            <span v-else>検索</span>
+            検索
           </button>
           <button 
             @click="clearFilters" 
             class="btn btn-secondary"
-            :disabled="isLoading"
           >
             クリア
           </button>
@@ -94,11 +91,7 @@
         </div>
       </div>
 
-      <div v-if="isLoading" class="loading">
-        データを読み込み中...
-      </div>
-
-      <div v-else-if="filteredSales.length === 0" class="empty-state">
+      <div v-if="filteredSales.length === 0" class="empty-state">
         <p>売上データがありません。</p>
         <p>検索条件を変更するか、新しい売上を登録してください。</p>
       </div>
@@ -236,6 +229,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useSalesStore } from '../stores/sales'
 import { useCustomersStore } from '../stores/customers'
 import { useProductsStore } from '../stores/products'
+import { useLoading } from '../composables/useLoading'
 
 // Props
 const props = defineProps({
@@ -252,6 +246,7 @@ const emit = defineEmits(['refresh'])
 const salesStore = useSalesStore()
 const customersStore = useCustomersStore()
 const productsStore = useProductsStore()
+const { setLoading, clearLoading } = useLoading()
 
 // Reactive data
 const filters = ref({
@@ -263,7 +258,7 @@ const filters = ref({
 
 const filteredSales = ref([])
 const selectedSale = ref(null)
-const isLoading = ref(false)
+// isLoadingは共通のローディング画面を使用するため削除
 const isDeleting = ref(null)
 const error = ref('')
 
@@ -274,6 +269,8 @@ const products = computed(() => productsStore.sortedProducts)
 // Methods
 const initializeData = async () => {
   try {
+    setLoading(true, 'データを初期化中...', '顧客・商品・売上データを読み込んでいます')
+    
     // 各ストアの初期化
     await Promise.all([
       customersStore.initializeCustomers(),
@@ -286,12 +283,14 @@ const initializeData = async () => {
   } catch (err) {
     console.error('Failed to initialize data:', err)
     error.value = 'データの初期化に失敗しました'
+  } finally {
+    clearLoading()
   }
 }
 
 const loadSales = async () => {
   try {
-    isLoading.value = true
+    setLoading(true, '売上データを読み込み中...', '売上情報を取得しています')
     error.value = ''
     
     // 全売上データを取得
@@ -302,13 +301,13 @@ const loadSales = async () => {
     console.error('Failed to load sales:', err)
     error.value = '売上データの読み込みに失敗しました'
   } finally {
-    isLoading.value = false
+    clearLoading()
   }
 }
 
 const searchSales = async () => {
   try {
-    isLoading.value = true
+    setLoading(true, '検索中...', '売上データを検索しています')
     error.value = ''
     
     // フィルタ条件で検索
@@ -319,7 +318,7 @@ const searchSales = async () => {
     console.error('Failed to search sales:', err)
     error.value = '売上データの検索に失敗しました'
   } finally {
-    isLoading.value = false
+    clearLoading()
   }
 }
 
@@ -347,6 +346,7 @@ const deleteSale = async (saleId) => {
   }
   
   try {
+    setLoading(true, '削除中...', '売上を削除しています')
     isDeleting.value = saleId
     error.value = ''
     
@@ -362,6 +362,7 @@ const deleteSale = async (saleId) => {
     console.error('Failed to delete sale:', err)
     error.value = '売上の削除に失敗しました'
   } finally {
+    clearLoading()
     isDeleting.value = null
   }
 }

@@ -1,10 +1,10 @@
 <template>
   <AppLayout>
-        <div class="welcome-section">
-          <h2>ようこそ、{{ authStore.userName }}さん</h2>
-          <p>請求書管理システムへようこそ。左上のアイコンをタップしてメニューを開き、機能を選択してください。</p>
-        </div>
-      </AppLayout>
+    <div class="welcome-section">
+      <h2>ようこそ、{{ authStore.userName }}さん</h2>
+      <p>請求書管理システムへようこそ。左上のアイコンをタップしてメニューを開き、機能を選択してください。</p>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup>
@@ -12,11 +12,13 @@ import { onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { useRouter } from 'vue-router'
+import { useLoading } from '../composables/useLoading'
 import AppLayout from '../components/AppLayout.vue'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const router = useRouter()
+const { setLoading, clearLoading } = useLoading()
 
 onMounted(async () => {
   try {
@@ -29,8 +31,16 @@ onMounted(async () => {
     
     console.log('✅ User authenticated, initializing data...')
     
-    // 設定データを初期化
-    await settingsStore.initializeSettings()
+    // 設定データを初期化（既に初期化済みの場合はスキップ）
+    if (!settingsStore.isInitialized) {
+      // ローディング開始
+      setLoading(true, 'データを読み込み中...', '設定情報を確認しています')
+      
+      await settingsStore.initializeSettings()
+      
+      // ローディング終了
+      clearLoading()
+    }
     
     // 事業者設定が存在しない場合は設定画面にリダイレクト
     if (!settingsStore.hasBusinessSettings) {
@@ -43,6 +53,7 @@ onMounted(async () => {
     
   } catch (err) {
     console.error('Failed to initialize data:', err)
+    clearLoading()
   }
 })
 

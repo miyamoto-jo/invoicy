@@ -1,6 +1,13 @@
 <template>
   <div id="app">
     <router-view />
+    
+    <!-- グローバルローディング画面 -->
+    <LoadingScreen
+      v-if="globalLoading"
+      :title="loadingTitle"
+      :message="loadingMessage"
+    />
   </div>
 </template>
 
@@ -8,6 +15,8 @@
 import { onMounted, watch } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
+import { globalLoading, loadingTitle, loadingMessage } from './composables/useLoading'
+import LoadingScreen from './components/LoadingScreen.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()

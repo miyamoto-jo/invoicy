@@ -4,12 +4,7 @@
       <h1>Invoicy</h1>
       <p>Googleアカウントでログインして、請求書管理を始めましょう</p>
       
-      <div v-if="authStore.isLoading" class="loading">
-        <div class="spinner"></div>
-        <p>認証中...</p>
-      </div>
-      
-      <div v-else-if="authStore.error" class="error-message">
+      <div v-if="authStore.error" class="error-message">
         <p>{{ authStore.error }}</p>
         <button @click="retryAuth" class="btn btn-primary">
           再試行
@@ -46,15 +41,31 @@
 
 <script setup>
 import { useAuthStore } from '../stores/auth'
+import { useLoading } from '../composables/useLoading'
 
 const authStore = useAuthStore()
+const { setLoading, clearLoading } = useLoading()
 
 const handleSignIn = async () => {
-  await authStore.signIn()
+  try {
+    setLoading(true, '認証中...', 'Googleアカウントで認証しています')
+    await authStore.signIn()
+  } catch (err) {
+    console.error('Sign in failed:', err)
+  } finally {
+    clearLoading()
+  }
 }
 
 const retryAuth = async () => {
-  await authStore.initializeAuth()
+  try {
+    setLoading(true, '認証を再試行中...', '認証情報を確認しています')
+    await authStore.initializeAuth()
+  } catch (err) {
+    console.error('Auth retry failed:', err)
+  } finally {
+    clearLoading()
+  }
 }
 </script>
 

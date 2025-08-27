@@ -32,7 +32,6 @@
             <button
               @click="hideForm"
               class="btn btn-secondary"
-              :disabled="isLoading"
             >
               一覧に戻る
             </button>
@@ -53,7 +52,6 @@
             <button
               @click="hideBulkCreateForm"
               class="btn btn-secondary"
-              :disabled="isLoading"
             >
               一覧に戻る
             </button>
@@ -72,12 +70,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useProductsStore } from '../stores/products'
+import { useLoading } from '../composables/useLoading'
 import ProductList from '../components/ProductList.vue'
 import ProductForm from '../components/ProductForm.vue'
 import ProductBulkCreate from '../components/ProductBulkCreate.vue'
 import AppLayout from '../components/AppLayout.vue'
 
 const productsStore = useProductsStore()
+const { setLoading, clearLoading } = useLoading()
 
 // ローカル状態
 const showForm = ref(false)
@@ -95,7 +95,14 @@ const isEdit = computed(() => !!editingProduct.value)
 
 // 初期化
 onMounted(async () => {
-  await productsStore.initializeProducts()
+  try {
+    setLoading(true, '商品データを読み込み中...', '商品情報を取得しています')
+    await productsStore.initializeProducts()
+  } catch (err) {
+    console.error('Failed to initialize products:', err)
+  } finally {
+    clearLoading()
+  }
 })
 
 // フォーム表示制御
@@ -128,6 +135,8 @@ const hideBulkCreateForm = () => {
 // フォーム送信処理
 const handleSubmit = async (productData) => {
   try {
+    setLoading(true, '保存中...', '商品情報を保存しています')
+    
     if (isEdit.value) {
       await productsStore.updateProduct(editingProduct.value.id, productData)
     } else {
@@ -139,29 +148,37 @@ const handleSubmit = async (productData) => {
   } catch (err) {
     // エラーはストアで管理されるため、ここでは何もしない
     console.error('Product operation failed:', err)
+  } finally {
+    clearLoading()
   }
 }
 
 // 一括登録処理
 const handleBulkSubmit = async (productsData) => {
   try {
-    await productsStore.bulkCreateProducts(productsData)
+    setLoading(true, '一括登録中...', `${productsData.length}件の商品を登録しています`)
+    
+    await productsStore.createBulkProducts(productsData)
     
     // 成功時は一覧に戻る
     hideBulkCreateForm()
   } catch (err) {
-    // エラーはストアで管理されるため、ここでは何もしない
-    console.error('Bulk create failed:', err)
+    console.error('Bulk product operation failed:', err)
+  } finally {
+    clearLoading()
   }
 }
 
 // 削除処理
 const handleDelete = async (productId) => {
   try {
+    setLoading(true, '削除中...', '商品を削除しています')
+    
     await productsStore.deleteProduct(productId)
   } catch (err) {
-    // エラーはストアで管理されるため、ここでは何もしない
     console.error('Product deletion failed:', err)
+  } finally {
+    clearLoading()
   }
 }
 </script>

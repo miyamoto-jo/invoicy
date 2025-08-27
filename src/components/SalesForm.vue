@@ -152,10 +152,9 @@
         <button 
           type="submit" 
           class="btn btn-primary"
-          :disabled="isLoading || selectedProducts.length === 0"
+          :disabled="selectedProducts.length === 0"
         >
-          <span v-if="isLoading">保存中...</span>
-          <span v-else>売上書込み</span>
+          売上書込み
         </button>
         
         <!-- 売上反映ボタン -->
@@ -164,10 +163,8 @@
             type="button" 
             @click="handleReflectSales" 
             class="btn btn-success"
-            :disabled="isReflecting"
           >
-            <span v-if="isReflecting">反映中...</span>
-            <span v-else>売上反映</span>
+            売上反映
           </button>
           <span class="sales-count">({{ localSales.length }}件)</span>
         </div>
@@ -176,7 +173,6 @@
           type="button" 
           @click="handleCancel" 
           class="btn btn-secondary"
-          :disabled="isLoading"
         >
           キャンセル
         </button>
@@ -210,6 +206,7 @@ import { useProductsStore } from '../stores/products'
 import { useTaxesStore } from '../stores/taxes'
 import { useSalesStore } from '../stores/sales'
 import { useSettingsStore } from '../stores/settings'
+import { useLoading } from '../composables/useLoading'
 
 // Props
 const props = defineProps({
@@ -228,6 +225,7 @@ const productsStore = useProductsStore()
 const taxesStore = useTaxesStore()
 const salesStore = useSalesStore()
 const settingsStore = useSettingsStore()
+const { setLoading, clearLoading } = useLoading()
 
 // Reactive data
 const formData = ref({
@@ -240,8 +238,8 @@ const formData = ref({
 // 選択された商品の管理
 const selectedProducts = ref([])
 const errors = ref({})
-const isLoading = ref(false)
-const isReflecting = ref(false)
+// isLoadingは共通のローディング画面を使用するため削除
+// isReflectingは共通のローディング画面を使用するため削除
 const error = ref('')
 const showCancelDialog = ref(false)
 
@@ -457,7 +455,7 @@ const handleSubmit = async () => {
       return
     }
     
-    isLoading.value = true
+    setLoading(true, '保存中...', '売上情報を保存しています')
     error.value = ''
     
     // 売上データの作成
@@ -491,14 +489,14 @@ const handleSubmit = async () => {
     // 親コンポーネントにエラーを通知
     emit('error', { message: errorMessage })
   } finally {
-    isLoading.value = false
+    clearLoading()
   }
 }
 
 // 売上反映処理
 const handleReflectSales = async () => {
   try {
-    isReflecting.value = true
+    setLoading(true, '反映中...', '売上情報をGoogleドライブに反映しています')
     error.value = ''
     
     // ローカルメモリの売上情報を一括でGoogleドライブに反映
@@ -517,7 +515,7 @@ const handleReflectSales = async () => {
     // 親コンポーネントにエラーを通知
     emit('error', { message: errorMessage })
   } finally {
-    isReflecting.value = false
+    clearLoading()
   }
 }
 

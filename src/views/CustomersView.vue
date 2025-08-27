@@ -100,12 +100,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useCustomersStore } from '../stores/customers'
+import { useLoading } from '../composables/useLoading'
 import CustomerList from '../components/CustomerList.vue'
 import CustomerForm from '../components/CustomerForm.vue'
 import CustomerBulkCreate from '../components/CustomerBulkCreate.vue'
 import AppLayout from '../components/AppLayout.vue'
 
 const customersStore = useCustomersStore()
+const { setLoading, clearLoading } = useLoading()
 
 // State
 const showForm = ref(false)
@@ -118,9 +120,12 @@ const successMessage = ref('')
 // 初期化
 onMounted(async () => {
   try {
+    setLoading(true, '顧客データを読み込み中...', '顧客情報を取得しています')
     await customersStore.initializeCustomers()
   } catch (err) {
     console.error('Failed to initialize customers:', err)
+  } finally {
+    clearLoading()
   }
 })
 
@@ -175,6 +180,7 @@ const editSelectedCustomer = () => {
 
 const deleteCustomer = async (customer) => {
   try {
+    setLoading(true, '削除中...', `「${customer.name}」を削除しています`)
     await customersStore.deleteCustomer(customer.id)
     showSuccessMessage(`「${customer.name}」を削除しました`)
     
@@ -184,6 +190,8 @@ const deleteCustomer = async (customer) => {
     }
   } catch (err) {
     console.error('Failed to delete customer:', err)
+  } finally {
+    clearLoading()
   }
 }
 
@@ -196,47 +204,50 @@ const deleteSelectedCustomer = async () => {
 const handleFormSubmit = async (customerData) => {
   try {
     isSubmitting.value = true
+    setLoading(true, '保存中...', '顧客情報を保存しています')
     
     if (editingCustomer.value) {
-      // 更新
       await customersStore.updateCustomer(editingCustomer.value.id, customerData)
       showSuccessMessage(`「${customerData.name}」を更新しました`)
     } else {
-      // 新規作成
       await customersStore.createCustomer(customerData)
       showSuccessMessage(`「${customerData.name}」を登録しました`)
     }
     
     closeForm()
-    
   } catch (err) {
-    console.error('Failed to submit customer:', err)
+    console.error('Failed to save customer:', err)
   } finally {
     isSubmitting.value = false
+    clearLoading()
   }
 }
 
 const handleBulkSubmit = async (customersData) => {
   try {
     isSubmitting.value = true
+    setLoading(true, '一括登録中...', `${customersData.length}件の顧客を登録しています`)
     
-    await customersStore.bulkCreateCustomers(customersData)
-    showSuccessMessage(`${customersData.length}件の顧客を一括登録しました`)
+    await customersStore.createBulkCustomers(customersData)
+    showSuccessMessage(`${customersData.length}件の顧客を登録しました`)
     
     closeBulkCreateForm()
-    
   } catch (err) {
-    console.error('Failed to bulk submit customers:', err)
+    console.error('Failed to bulk create customers:', err)
   } finally {
     isSubmitting.value = false
+    clearLoading()
   }
 }
 
 const retryLoad = async () => {
   try {
+    setLoading(true, '再読み込み中...', '顧客データを再取得しています')
     await customersStore.initializeCustomers()
   } catch (err) {
-    console.error('Failed to retry load:', err)
+    console.error('Failed to retry load customers:', err)
+  } finally {
+    clearLoading()
   }
 }
 
@@ -252,9 +263,7 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
+    day: '2-digit'
   })
 }
 </script>

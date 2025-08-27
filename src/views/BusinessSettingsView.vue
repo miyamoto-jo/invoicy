@@ -135,11 +135,16 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
+import { useLoading } from '../composables/useLoading'
 import AppLayout from '../components/AppLayout.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
+const { setLoading, clearLoading } = useLoading()
+
+// 初期化完了フラグ
+const isInitialized = ref(false)
 
 // フォームデータ
 const formData = reactive({
@@ -166,8 +171,18 @@ const isEditMode = computed(() => settingsStore.hasBusinessSettings)
 
 onMounted(async () => {
   try {
+    // ローディング開始
+    setLoading(true, '設定を確認中...', '事業者設定を読み込んでいます')
+    
     // 設定の初期化
     await settingsStore.initializeSettings()
+    
+    // 設定が存在する場合はダッシュボードにリダイレクト
+    if (settingsStore.hasBusinessSettings) {
+      console.log('✅ Business settings found, redirecting to dashboard')
+      router.push('/dashboard')
+      return
+    }
     
     // 編集モードの場合は既存データをフォームに設定
     if (isEditMode.value && settingsStore.businessSettings) {
@@ -179,8 +194,14 @@ onMounted(async () => {
       formData.phone = business.phone || ''
       formData.address = business.address || ''
     }
+    
+    isInitialized.value = true
+    
   } catch (err) {
     console.error('Failed to initialize settings:', err)
+  } finally {
+    // ローディング終了
+    clearLoading()
   }
 })
 
@@ -222,6 +243,9 @@ const handleSubmit = async () => {
   }
   
   try {
+    // ローディング開始
+    setLoading(true, '保存中...', '事業者設定を保存しています')
+    
     const businessData = {
       name: formData.name.trim(),
       number: formData.number.trim(),
@@ -243,6 +267,9 @@ const handleSubmit = async () => {
   } catch (err) {
     console.error('Failed to save business settings:', err)
     // エラーはストアで管理されているため、ここでは何もしない
+  } finally {
+    // ローディング終了
+    clearLoading()
   }
 }
 

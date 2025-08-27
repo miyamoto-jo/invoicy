@@ -1,10 +1,10 @@
 <template>
   <AppLayout>
-        <div class="welcome-section">
-          <h2>ようこそ、{{ authStore.userName }}さん</h2>
-          <p>請求書管理システムへようこそ。左上のアイコンをタップしてメニューを開き、機能を選択してください。</p>
-        </div>
-      </AppLayout>
+    <div class="welcome-section">
+      <h2>ようこそ、{{ authStore.userName }}さん</h2>
+      <p>請求書管理システムへようこそ。左上のアイコンをタップしてメニューを開き、機能を選択してください。</p>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup>
@@ -12,11 +12,13 @@ import { onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { useRouter } from 'vue-router'
+import { useLoading } from '../composables/useLoading'
 import AppLayout from '../components/AppLayout.vue'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const router = useRouter()
+const { setLoading, clearLoading } = useLoading()
 
 onMounted(async () => {
   try {
@@ -28,6 +30,9 @@ onMounted(async () => {
     }
     
     console.log('✅ User authenticated, initializing data...')
+    
+    // ローディング開始
+    setLoading(true, 'データを読み込み中...', '設定情報を確認しています')
     
     // 設定データを初期化
     await settingsStore.initializeSettings()
@@ -43,6 +48,9 @@ onMounted(async () => {
     
   } catch (err) {
     console.error('Failed to initialize data:', err)
+  } finally {
+    // ローディング終了
+    clearLoading()
   }
 })
 

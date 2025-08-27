@@ -77,11 +77,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useTaxesStore } from '../stores/taxes'
+import { useLoading } from '../composables/useLoading'
 import TaxList from '../components/TaxList.vue'
 import TaxForm from '../components/TaxForm.vue'
 import AppLayout from '../components/AppLayout.vue'
 
 const taxesStore = useTaxesStore()
+const { setLoading, clearLoading } = useLoading()
 
 // State
 const showForm = ref(false)
@@ -90,9 +92,12 @@ const editingTax = ref(null)
 // 初期化
 onMounted(async () => {
   try {
+    setLoading(true, '税率データを読み込み中...', '税率情報を取得しています')
     await taxesStore.initializeTaxes()
   } catch (err) {
     console.error('Failed to initialize taxes:', err)
+  } finally {
+    clearLoading()
   }
 })
 
@@ -104,14 +109,19 @@ const handleEdit = (tax) => {
 
 const handleDelete = async (taxId) => {
   try {
+    setLoading(true, '削除中...', '税率を削除しています')
     await taxesStore.deleteTax(taxId)
   } catch (err) {
     console.error('Failed to delete tax:', err)
+  } finally {
+    clearLoading()
   }
 }
 
 const handleSubmit = async (taxData) => {
   try {
+    setLoading(true, '保存中...', '税率情報を保存しています')
+    
     if (editingTax.value) {
       // 編集
       await taxesStore.updateTax(editingTax.value.id, taxData)
@@ -122,30 +132,41 @@ const handleSubmit = async (taxData) => {
     closeForm()
   } catch (err) {
     console.error('Failed to submit tax:', err)
+  } finally {
+    clearLoading()
   }
 }
 
 const handleRetry = async () => {
   try {
+    setLoading(true, '再読み込み中...', '税率データを再取得しています')
     await taxesStore.initializeTaxes()
   } catch (err) {
     console.error('Failed to retry:', err)
+  } finally {
+    clearLoading()
   }
 }
 
 const handleRoundingChange = async () => {
   try {
+    setLoading(true, '設定を更新中...', '端数計算方式を更新しています')
     await taxesStore.updateTaxSettings(taxesStore.rounding, taxesStore.defaultTaxId)
   } catch (err) {
     console.error('Failed to update rounding:', err)
+  } finally {
+    clearLoading()
   }
 }
 
 const handleDefaultTaxChange = async () => {
   try {
+    setLoading(true, '設定を更新中...', 'デフォルト税率を更新しています')
     await taxesStore.updateTaxSettings(taxesStore.rounding, taxesStore.defaultTaxId)
   } catch (err) {
     console.error('Failed to update default tax:', err)
+  } finally {
+    clearLoading()
   }
 }
 

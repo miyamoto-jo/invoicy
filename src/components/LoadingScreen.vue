@@ -5,7 +5,7 @@
         <!-- 猫のローディングアニメーション画像 -->
         <img 
           v-if="imageLoaded"
-          :src="imageUrl" 
+          :src="selectedImage" 
           alt="ローディング中" 
           class="loading-cat"
         />
@@ -24,7 +24,9 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import loadingCatImage from '../assets/loading-cat.png'
+import loadingCat1 from '../assets/loading-cat1.png'
+import loadingCat2 from '../assets/loading-cat2.png'
+import loadingCat3 from '../assets/loading-cat3.png'
 
 const props = defineProps({
   title: {
@@ -40,9 +42,11 @@ const props = defineProps({
 const imageLoaded = ref(false)
 const debug = ref(true) // デバッグモードを有効化
 
-// Viteのアセット処理を使用
-const imageUrl = computed(() => {
-  return loadingCatImage
+// 3枚の画像からランダムで1枚を選択
+const selectedImage = computed(() => {
+  const images = [loadingCat1, loadingCat2, loadingCat3]
+  const randomIndex = Math.floor(Math.random() * images.length)
+  return images[randomIndex]
 })
 
 const tryLoadImage = (url) => {
@@ -55,28 +59,22 @@ const tryLoadImage = (url) => {
 }
 
 const loadImageWithFallback = async () => {
-  const paths = [
-    loadingCatImage, // Viteのアセット処理を使用
-    `/loading-cat.png`,
-    `./loading-cat.png`,
-    `loading-cat.png`,
-    `/public/loading-cat.png`
-  ]
+  const images = [loadingCat1, loadingCat2, loadingCat3]
   
-  for (const path of paths) {
+  for (const image of images) {
     try {
-      console.log(`🔄 Trying to load image from: ${path}`)
-      await tryLoadImage(path)
-      console.log(`✅ Successfully loaded image from: ${path}`)
-      imageLoaded.value = true
-      return path
+      console.log(`🔄 Trying to load image: ${image}`)
+      await tryLoadImage(image)
+      console.log(`✅ Successfully loaded image: ${image}`)
     } catch (error) {
-      console.log(`❌ Failed to load image from: ${path}`)
+      console.log(`❌ Failed to load image: ${image}`)
+      imageLoaded.value = false
+      return
     }
   }
   
-  console.log('❌ All image paths failed')
-  imageLoaded.value = false
+  console.log('✅ All images loaded successfully')
+  imageLoaded.value = true
 }
 
 onMounted(async () => {
@@ -127,6 +125,18 @@ onMounted(async () => {
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
 }
 
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
 .loading-placeholder {
   width: 120px;
   height: 120px;
@@ -142,18 +152,6 @@ onMounted(async () => {
   border-top: 4px solid #4285f4;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-}
-
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-10px);
-  }
-  60% {
-    transform: translateY(-5px);
-  }
 }
 
 @keyframes spin {

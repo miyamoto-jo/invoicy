@@ -271,18 +271,19 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('✅ User info fetched, isAuthenticated:', isAuthenticated.value)
       console.log('👤 User data:', user.value)
       
-      // アプリフォルダの確認・作成（エラーが発生しても認証は継続）
+      // アプリフォルダの確認・作成
       try {
         console.log('📁 Ensuring app folder...')
         await ensureAppFolder(access_token)
         console.log('✅ App folder ensured')
       } catch (folderError) {
-        console.warn('⚠️ App folder creation failed, but authentication continues:', {
+        console.error('❌ App folder creation failed:', {
           message: folderError.message,
           stack: folderError.stack,
           name: folderError.name
         })
-        // アプリフォルダ作成の失敗は認証を妨げない
+        // アプリフォルダ作成の失敗は認証を妨げないが、ログには記録
+        // 設定ストアの初期化時に再試行される
       }
       
       // 認証成功後、ダッシュボードにリダイレクト
@@ -326,7 +327,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
   
-  const signOut = () => {
+  const signOut = async () => {
     try {
       // セッションストレージからトークンを削除
       sessionStorage.removeItem('google_access_token')
@@ -356,6 +357,15 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = null
       isAuthenticated.value = false
       error.value = null
+      
+      // 設定ストアもリセット
+      try {
+        const { useSettingsStore } = await import('../stores/settings')
+        const settingsStore = useSettingsStore()
+        settingsStore.resetSettings()
+      } catch (err) {
+        console.log('Settings store reset failed (may not be initialized):', err)
+      }
       
     } catch (err) {
       console.error('Sign out error:', err)

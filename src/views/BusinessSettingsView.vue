@@ -171,13 +171,19 @@ const isEditMode = computed(() => settingsStore.hasBusinessSettings)
 
 onMounted(async () => {
   try {
-    // ローディング開始
-    setLoading(true, '設定を確認中...', '事業者設定を読み込んでいます')
+    // 設定が既に初期化されているかチェック
+    if (!settingsStore.isInitialized) {
+      // ローディング開始
+      setLoading(true, '設定を確認中...', '事業者設定を読み込んでいます')
+      
+      // 設定の初期化
+      await settingsStore.initializeSettings()
+      
+      // ローディング終了
+      clearLoading()
+    }
     
-    // 設定の初期化
-    await settingsStore.initializeSettings()
-    
-    // 設定が存在しない場合のみダッシュボードにリダイレクト（初回設定時のみ）
+    // 設定が存在しない場合は初回設定モード
     if (!settingsStore.hasBusinessSettings) {
       console.log('❌ No business settings found, staying on settings page for initial setup')
     } else {
@@ -198,8 +204,6 @@ onMounted(async () => {
     
   } catch (err) {
     console.error('Failed to initialize settings:', err)
-  } finally {
-    // ローディング終了
     clearLoading()
   }
 })
@@ -261,6 +265,7 @@ const handleSubmit = async () => {
     }
     
     // 成功時はダッシュボードにリダイレクト
+    console.log('✅ Business settings saved successfully, redirecting to dashboard')
     router.push('/dashboard')
     
   } catch (err) {
@@ -272,19 +277,19 @@ const handleSubmit = async () => {
   }
 }
 
-const handleCancel = () => {
+const handleCancel = async () => {
   if (isEditMode.value) {
     // 編集モードの場合はダッシュボードに戻る
     router.push('/dashboard')
   } else {
     // 作成モードの場合はログアウト
-    authStore.signOut()
+    await authStore.signOut()
     router.push('/')
   }
 }
 
 const handleSignOut = async () => {
-  authStore.signOut()
+  await authStore.signOut()
   router.push('/')
 }
 </script>

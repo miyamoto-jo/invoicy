@@ -177,22 +177,21 @@ onMounted(async () => {
     // 設定の初期化
     await settingsStore.initializeSettings()
     
-    // 設定が存在する場合はダッシュボードにリダイレクト
-    if (settingsStore.hasBusinessSettings) {
-      console.log('✅ Business settings found, redirecting to dashboard')
-      router.push('/dashboard')
-      return
-    }
-    
-    // 編集モードの場合は既存データをフォームに設定
-    if (isEditMode.value && settingsStore.businessSettings) {
-      const business = settingsStore.businessSettings
-      formData.name = business.name || ''
-      formData.number = business.number || ''
-      formData.representative = business.representative || ''
-      formData.bankInfo = business.bankInfo || ''
-      formData.phone = business.phone || ''
-      formData.address = business.address || ''
+    // 設定が存在しない場合のみダッシュボードにリダイレクト（初回設定時のみ）
+    if (!settingsStore.hasBusinessSettings) {
+      console.log('❌ No business settings found, staying on settings page for initial setup')
+    } else {
+      console.log('✅ Business settings found, loading for editing')
+      // 編集モードの場合は既存データをフォームに設定
+      if (settingsStore.businessSettings) {
+        const business = settingsStore.businessSettings
+        formData.name = business.name || ''
+        formData.number = business.number || ''
+        formData.representative = business.representative || ''
+        formData.bankInfo = business.bankInfo || ''
+        formData.phone = business.phone || ''
+        formData.address = business.address || ''
+      }
     }
     
     isInitialized.value = true

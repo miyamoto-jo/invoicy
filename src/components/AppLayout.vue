@@ -15,7 +15,12 @@
             <div v-else class="user-avatar-placeholder" @click="openMenu">
               {{ authStore.userName?.charAt(0) || 'U' }}
             </div>
-            <h1>Invoicy</h1>
+            <img 
+              src="../assets/invoicy-title-logo.png" 
+              alt="Invoicy" 
+              class="logo-image"
+              @click="goToDashboard"
+            />
           </div>
         </div>
       </div>
@@ -38,9 +43,11 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import SlideMenu from './SlideMenu.vue'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const isMenuOpen = ref(false)
 
@@ -51,6 +58,11 @@ const openMenu = () => {
 
 const closeMenu = () => {
   isMenuOpen.value = false
+}
+
+// ダッシュボードにリダイレクト
+const goToDashboard = () => {
+  router.push('/dashboard')
 }
 </script>
 
@@ -111,6 +123,17 @@ const closeMenu = () => {
   transform: scale(1.05);
 }
 
+.logo-image {
+  height: 2.0rem;
+  width: auto;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.logo-image:hover {
+  transform: scale(1.05);
+}
+
 .header h1 {
   color: #333;
   font-size: 1.5rem;
@@ -143,6 +166,10 @@ const closeMenu = () => {
   .user-avatar-placeholder {
     width: 32px;
     height: 32px;
+  }
+  
+  .logo-image {
+    height: 1.7rem;
   }
 }
 </style>

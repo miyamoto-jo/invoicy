@@ -1,7 +1,25 @@
 <template>
   <div class="auth-container">
     <div class="auth-card">
-      <h1>Invoicy</h1>
+      <!-- タイトル画像セクション -->
+      <div class="title-images">
+        <img 
+          src="../assets/loading-cat2.png" 
+          alt="Loading Cat 2" 
+          class="title-image cat-image"
+        />
+        <img 
+          src="../assets/invoicy-title-logo.png" 
+          alt="Invoicy Title Logo" 
+          class="title-image logo-image"
+        />
+        <img 
+          src="../assets/loading-cat1.png" 
+          alt="Loading Cat 1" 
+          class="title-image cat-image"
+        />
+      </div>
+      
       <p>Googleアカウントでログインして、請求書管理を始めましょう</p>
       
       <div v-if="authStore.error" class="error-message">
@@ -70,6 +88,81 @@ const retryAuth = async () => {
 </script>
 
 <style scoped>
+/* タイトル画像のスタイル */
+.title-images {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.title-image {
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.title-image:hover {
+  transform: scale(1.05);
+}
+
+/* PC版のスタイル */
+@media (min-width: 768px) {
+  .title-images {
+    gap: 30px;
+    margin-bottom: 40px;
+  }
+  
+  .cat-image {
+    width: 80px;
+  }
+  
+  .logo-image {
+    width: 300px;
+    height: auto;
+    max-height: 120px;
+  }
+}
+
+/* スマホ版のスタイル */
+@media (max-width: 767px) {
+  .title-images {
+    gap: 12px;
+    margin-bottom: 25px;
+  }
+  
+  .cat-image {
+    width: 45px;
+  }
+  
+  .logo-image {
+    width: 200px;
+    height: auto;
+    max-height: 70px;
+  }
+}
+
+/* 超小さい画面用 */
+@media (max-width: 480px) {
+  .title-images {
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .cat-image {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .logo-image {
+    width: 80px;
+    height: auto;
+    max-height: 50px;
+  }
+}
+
 .google-signin-btn {
   display: flex;
   align-items: center;

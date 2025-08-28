@@ -76,6 +76,13 @@ body {
   width: 100%;
 }
 
+/* PC版のauth-card */
+@media (min-width: 768px) {
+  .auth-card {
+    max-width: 600px;
+  }
+}
+
 .auth-card h1 {
   margin-bottom: 20px;
   color: #333;

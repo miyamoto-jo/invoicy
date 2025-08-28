@@ -287,6 +287,18 @@ export const useSettingsStore = defineStore('settings', () => {
         ...businessData,
         updatedAt: new Date().toISOString()
       }
+
+      // 必要な情報のみを抽出
+      const essentialSettings = {
+        name: settingsData.name,
+        representative: settingsData.representative,
+        number: settingsData.number,
+        bankInfo: settingsData.bankInfo,
+        phone: settingsData.phone,
+        address: settingsData.address,
+        createdAt: settingsData.createdAt,
+        updatedAt: settingsData.updatedAt
+      }
       
       // ファイルの内容を更新
       const updateResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
@@ -300,11 +312,14 @@ export const useSettingsStore = defineStore('settings', () => {
       
       if (!updateResponse.ok) {
         const errorText = await updateResponse.text()
-        throw new Error(`設定ファイルの更新に失敗しました: ${updateResponse.status} ${updateResponse.statusText}`)
+        throw new Error(`設定ファイルの更新に失敗しました: ${updateResponse.status} ${updateResponse.statusText} ${errorText}`)
       }
       
       const updatedFile = await updateResponse.json()
       console.log('Settings file updated:', updatedFile.id)
+
+      // ローカルストレージに保存
+      authStore.saveToLocalStorage(authStore.STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
       
       // 状態を更新
       businessSettings.value = settingsData

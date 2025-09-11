@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
+import { APP_CONFIG } from '../config/api.js'
+import { googleApiClient } from '../services/googleApi.js'
 
 export const useSalesStore = defineStore('sales', () => {
   // State
@@ -18,7 +20,7 @@ export const useSalesStore = defineStore('sales', () => {
   })
   
   // Google Drive API設定
-  const SALES_FOLDER = 'sales'
+  const SALES_FOLDER = APP_CONFIG.SUB_FOLDERS[1] // 'sales'
   
   // Actions
   const initializeSales = async () => {
@@ -50,27 +52,15 @@ export const useSalesStore = defineStore('sales', () => {
       const salesFolder = await getOrCreateSalesFolder(token, appFolder.id)
       
       // salesフォルダ内の月次ファイル一覧を取得
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q='${salesFolder.id}' in parents and name contains 'ledger-' and trashed=false&orderBy=name desc`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
-      
-      if (!response.ok) {
-        throw new Error('月次売上ファイルの検索に失敗しました')
-      }
-      
-      const data = await response.json()
+      const query = `'${salesFolder.id}' in parents and name contains 'ledger-' and trashed=false`
+      const data = await googleApiClient.searchFiles(token, query, 'files(id,name,createdTime)', 'name desc')
       
       if (data.files && data.files.length > 0) {
         // 各月次ファイルの内容を取得
         const salesData = []
         for (const file of data.files) {
           try {
-            const content = await getFileContent(token, file.id)
+            const content = await googleApiClient.getFileContent(token, file.id)
             if (content) {
               // JSONL形式の内容をパース
               const lines = content.split('\n').filter(line => line.trim())
@@ -154,26 +144,15 @@ export const useSalesStore = defineStore('sales', () => {
       const fileName = `${dateStr}_${saleData.customerId}_${ticketId}.json`
       
       // 売上ファイルを作成
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: fileName,
-          parents: [salesFolder.id]
-        })
-      })
-      
-      if (!createResponse.ok) {
-        throw new Error('売上ファイルの作成に失敗しました')
+      const fileData = {
+        name: fileName,
+        parents: [salesFolder.id]
       }
-      
+      const createResponse = await googleApiClient.createFile(token, fileData)
       const file = await createResponse.json()
       
       // ファイルの内容を設定
-      await updateFileContent(token, file.id, newSale)
+      await googleApiClient.updateFileContent(token, file.id, newSale)
       
       // ローカルの状態を更新
       sales.value.unshift(newSale)
@@ -305,27 +284,14 @@ export const useSalesStore = defineStore('sales', () => {
         query += ` and name >= 'ledger-${fromYearMonth}.jsonl' and name <= 'ledger-${toYearMonth}.jsonl'`
       }
       
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&orderBy=name desc`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
-      
-      if (!response.ok) {
-        throw new Error('月次売上ファイルの検索に失敗しました')
-      }
-      
-      const data = await response.json()
+      const data = await googleApiClient.searchFiles(token, query, 'files(id,name)', 'name desc')
       
       if (data.files && data.files.length > 0) {
         // 各月次ファイルの内容を取得
         const salesData = []
         for (const file of data.files) {
           try {
-            const content = await getFileContent(token, file.id)
+            const content = await googleApiClient.getFileContent(token, file.id)
             if (content) {
               // JSONL形式の内容をパース
               const lines = content.split('\n').filter(line => line.trim())
@@ -416,33 +382,12 @@ export const useSalesStore = defineStore('sales', () => {
       const fileName = `${dateStr}_${saleToDelete.customerId}_${saleId}.json`
       
       // ファイルを検索
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and '${salesFolder.id}' in parents and trashed=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
-      
-      if (!response.ok) {
-        throw new Error('ファイルの検索に失敗しました')
-      }
-      
-      const data = await response.json()
+      const query = `name='${fileName}' and '${salesFolder.id}' in parents and trashed=false`
+      const data = await googleApiClient.searchFiles(token, query)
       
       if (data.files && data.files.length > 0) {
         // ファイルを削除（ゴミ箱に移動）
-        const deleteResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${data.files[0].id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
-        if (!deleteResponse.ok) {
-          throw new Error('ファイルの削除に失敗しました')
-        }
+        await googleApiClient.deleteFile(token, data.files[0].id)
         
         // ローカルの状態を更新
         const index = sales.value.findIndex(sale => sale.id === saleId)
@@ -492,44 +437,14 @@ export const useSalesStore = defineStore('sales', () => {
   const getOrCreateSalesFolder = async (token, appFolderId) => {
     try {
       // salesフォルダを検索
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${SALES_FOLDER}' and '${appFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
+      const searchResult = await googleApiClient.searchFolder(token, SALES_FOLDER, appFolderId)
       
-      if (!response.ok) {
-        throw new Error('フォルダの検索に失敗しました')
-      }
-      
-      const data = await response.json()
-      
-      if (data.files && data.files.length > 0) {
-        return data.files[0]
+      if (searchResult.files && searchResult.files.length > 0) {
+        return searchResult.files[0]
       }
       
       // salesフォルダを作成
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: SALES_FOLDER,
-          mimeType: 'application/vnd.google-apps.folder',
-          parents: [appFolderId]
-        })
-      })
-      
-      if (!createResponse.ok) {
-        throw new Error('フォルダの作成に失敗しました')
-      }
-      
-      return await createResponse.json()
+      return await googleApiClient.createFolder(token, SALES_FOLDER, appFolderId)
       
     } catch (err) {
       console.error('Failed to get or create sales folder:', err)
@@ -537,52 +452,18 @@ export const useSalesStore = defineStore('sales', () => {
     }
   }
   
-  const updateFileContent = async (token, fileId, content) => {
-    try {
-      const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(content)
-      })
-      
-      if (!response.ok) {
-        throw new Error('ファイル内容の更新に失敗しました')
-      }
-      
-      return await response.json()
-      
-    } catch (err) {
-      console.error('Failed to update file content:', err)
-      throw err
-    }
-  }
 
   const updateMonthlyLedger = async (token, salesFolderId, fileName, newSales) => {
     try {
       // 既存の月次ファイルを検索
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and '${salesFolderId}' in parents and trashed=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
-      
-      if (!response.ok) {
-        throw new Error('月次ファイルの検索に失敗しました')
-      }
-      
-      const data = await response.json()
+      const query = `name='${fileName}' and '${salesFolderId}' in parents and trashed=false`
+      const data = await googleApiClient.searchFiles(token, query)
       let existingSales = []
       
       if (data.files && data.files.length > 0) {
         // 既存ファイルが存在する場合、内容を取得
         const file = data.files[0]
-        const content = await getFileContent(token, file.id)
+        const content = await googleApiClient.getFileContent(token, file.id)
         if (content && Array.isArray(content)) {
           existingSales = content
         }
@@ -597,27 +478,16 @@ export const useSalesStore = defineStore('sales', () => {
       if (data.files && data.files.length > 0) {
         // 既存ファイルを更新
         const file = data.files[0]
-        await updateFileContent(token, file.id, jsonlContent)
+        await googleApiClient.updateFileContent(token, file.id, jsonlContent)
       } else {
         // 新しいファイルを作成
-        const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name: fileName,
-            parents: [salesFolderId]
-          })
-        })
-        
-        if (!createResponse.ok) {
-          throw new Error('月次ファイルの作成に失敗しました')
+        const fileData = {
+          name: fileName,
+          parents: [salesFolderId]
         }
-        
+        const createResponse = await googleApiClient.createFile(token, fileData)
         const file = await createResponse.json()
-        await updateFileContent(token, file.id, jsonlContent)
+        await googleApiClient.updateFileContent(token, file.id, jsonlContent)
       }
       
     } catch (err) {
@@ -626,25 +496,6 @@ export const useSalesStore = defineStore('sales', () => {
     }
   }
   
-  const getFileContent = async (token, fileId) => {
-    try {
-      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error('ファイル内容の取得に失敗しました')
-      }
-      
-      return await response.json()
-      
-    } catch (err) {
-      console.error('Failed to get file content:', err)
-      throw err
-    }
-  }
   
   return {
     // State

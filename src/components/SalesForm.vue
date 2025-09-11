@@ -205,7 +205,7 @@ import { useCustomersStore } from '../stores/customers'
 import { useProductsStore } from '../stores/products'
 import { useTaxesStore } from '../stores/taxes'
 import { useSalesStore } from '../stores/sales'
-import { useSettingsStore } from '../stores/settings'
+import { useSettingsStore } from '../stores/setting'
 import { useLoading } from '../composables/useLoading'
 
 // Props

@@ -134,7 +134,7 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { useSettingsStore } from '../stores/settings'
+import { useSettingsStore } from '../stores/setting'
 import { useLoading } from '../composables/useLoading'
 import AppLayout from '../components/AppLayout.vue'
 

@@ -158,7 +158,7 @@ const handleBulkSubmit = async (productsData) => {
   try {
     setLoading(true, '一括登録中...', `${productsData.length}件の商品を登録しています`)
     
-    await productsStore.createBulkProducts(productsData)
+    await productsStore.bulkCreateProducts(productsData)
     
     // 成功時は一覧に戻る
     hideBulkCreateForm()

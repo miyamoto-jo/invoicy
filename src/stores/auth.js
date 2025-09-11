@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { APP_CONFIG, STORAGE_KEYS, getSubFolderStorageKey } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
+import { useStorage } from '../composables/useStorage.js'
 
 export const useAuthStore = defineStore('auth', () => {
   // State
@@ -28,35 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
   const userName = computed(() => user.value?.name || '')
   
   // Local storage utilities
-  const saveToLocalStorage = (key, data) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(data))
-      console.log(`💾 Saved to localStorage: ${key}`)
-    } catch (err) {
-      console.error(`Failed to save to localStorage: ${key}`, err)
-    }
-  }
-  
-  const loadFromLocalStorage = (key) => {
-    try {
-      const data = localStorage.getItem(key)
-      return data ? JSON.parse(data) : null
-    } catch (err) {
-      console.error(`Failed to load from localStorage: ${key}`, err)
-      return null
-    }
-  }
-  
-  const clearLocalStorage = () => {
-    try {
-      Object.values(STORAGE_KEYS).forEach(key => {
-        localStorage.removeItem(key)
-      })
-      console.log('🧹 Cleared all invoicy data from localStorage')
-    } catch (err) {
-      console.error('Failed to clear localStorage', err)
-    }
-  }
+  const { saveToLocalStorage, loadFromLocalStorage, clearAppData } = useStorage()
   
   // Actions
   const initializeAuth = async () => {
@@ -327,7 +300,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       
       // アプリデータをローカルストレージから削除
-      clearLocalStorage()
+      clearAppData()
       
       // Google Identity Servicesのサインアウト
       if (window.google && window.google.accounts) {
@@ -640,10 +613,10 @@ export const useAuthStore = defineStore('auth', () => {
     getAppFolderId,
     getSubFolderId,
     
-    // Local storage utilities
+    // Local storage utilities (for backward compatibility)
     saveToLocalStorage,
     loadFromLocalStorage,
-    clearLocalStorage,
+    clearLocalStorage: clearAppData,
     STORAGE_KEYS
   }
 }) 

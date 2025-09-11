@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth.js'
-import { APP_CONFIG } from '../config/api.js'
+import { APP_CONFIG, STORAGE_KEYS } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
+import { useStorage } from '../composables/useStorage.js'
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -10,6 +11,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const isLoading = ref(false)
   const error = ref(null)
   const isInitialized = ref(false) // 初期化完了フラグを追加
+  
+  // Local storage utilities
+  const { saveToLocalStorage, loadFromLocalStorage } = useStorage()
   
   // Computed
   const hasBusinessSettings = computed(() => !!businessSettings.value)
@@ -34,7 +38,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       
       // ローカルストレージから事業者設定を確認
-      const cachedSettings = authStore.loadFromLocalStorage(authStore.STORAGE_KEYS.BUSINESS_SETTINGS)
+      const cachedSettings = loadFromLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS)
       if (cachedSettings) {
         console.log('✅ Using cached business settings from localStorage')
         businessSettings.value = cachedSettings
@@ -120,8 +124,7 @@ export const useSettingsStore = defineStore('settings', () => {
       businessSettings.value = essentialSettings || null
       
       // ローカルストレージに保存
-      const authStore = useAuthStore()
-      authStore.saveToLocalStorage(authStore.STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
+      saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
       
       console.log('Settings loaded successfully and cached:', businessSettings.value)
       
@@ -166,7 +169,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       
       // ローカルストレージに保存
-      authStore.saveToLocalStorage(authStore.STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
+      saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
       
       // 事業者設定を設定
       businessSettings.value = essentialSettings
@@ -252,7 +255,7 @@ export const useSettingsStore = defineStore('settings', () => {
       console.log('Settings file updated:', fileId)
 
       // ローカルストレージに保存
-      authStore.saveToLocalStorage(authStore.STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
+      saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
       
       // 状態を更新
       businessSettings.value = settingsData

@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { APP_CONFIG, STORAGE_KEYS, getSubFolderStorageKey } from '../config/api.js'
+import { googleApiClient } from '../services/googleApi.js'
 
 export const useAuthStore = defineStore('auth', () => {
   // State
@@ -13,27 +15,13 @@ export const useAuthStore = defineStore('auth', () => {
   
   // Configuration
   const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'your-client-id-here'
-  const SCOPES = [
-    'openid',
-    'email',
-    'profile',
-    'https://www.googleapis.com/auth/drive.file'
-  ].join(' ')
+  const SCOPES = googleApiClient.getScopes()
   
   // App folder configuration
-  const APP_FOLDER_NAME = import.meta.env.VITE_APP_FOLDER_NAME || 'Invoicy'
+  const APP_FOLDER_NAME = APP_CONFIG.FOLDER_NAME
   
   // Sub folders to create in the app folder
-  const SUB_FOLDERS = [
-    'masters',
-    'sales'
-  ]
-  
-  // Local storage keys
-  const STORAGE_KEYS = {
-    USER_INFO: 'invoicy_user_info',
-    BUSINESS_SETTINGS: 'invoicy_business_settings'
-  }
+  const SUB_FOLDERS = APP_CONFIG.SUB_FOLDERS
   
   // Computed
   const userEmail = computed(() => user.value?.email || '')
@@ -162,7 +150,8 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('🔍 Validating token...')
       console.log('🔑 Token available:', !!token)
       
-      const response = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${token}`)
+      const url = googleApiClient.getTokenInfoUrl(token)
+      const response = await fetch(url)
       
       console.log('📡 Token validation response status:', response.status)
       console.log('📡 Token validation response ok:', response.ok)
@@ -198,11 +187,8 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('👤 Fetching user info with token...')
       console.log('🔑 Token available:', !!token)
       
-      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const url = googleApiClient.getUserInfoUrl()
+      const response = await googleApiClient.makeAuthenticatedRequest(url, token)
       
       console.log('📡 User info response status:', response.status)
       console.log('📡 User info response ok:', response.ok)
@@ -333,11 +319,11 @@ export const useAuthStore = defineStore('auth', () => {
       sessionStorage.removeItem('google_access_token')
       
       // ローカルストレージからフォルダIDを削除
-      localStorage.removeItem('invoicy_app_folder_id')
+      localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
       
       // サブフォルダIDを削除
       for (const folderName of SUB_FOLDERS) {
-        localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+        localStorage.removeItem(getSubFolderStorageKey(folderName))
       }
       
       // アプリデータをローカルストレージから削除
@@ -386,43 +372,32 @@ export const useAuthStore = defineStore('auth', () => {
       // まず既存のフォルダを検索
       console.log('🔍 Searching for existing app folder...')
       const searchQuery = `name='${APP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
-      const searchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name)`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const searchResult = await googleApiClient.searchFiles(token, searchQuery, 'files(id,name)')
+      console.log('📄 Search result:', searchResult)
       
-      if (searchResponse.ok) {
-        const searchResult = await searchResponse.json()
-        console.log('📄 Search result:', searchResult)
+      if (searchResult.files && searchResult.files.length > 0) {
+        const existingFolder = searchResult.files[0]
+        console.log('✅ Found existing app folder:', existingFolder.id)
         
-        if (searchResult.files && searchResult.files.length > 0) {
-          const existingFolder = searchResult.files[0]
-          console.log('✅ Found existing app folder:', existingFolder.id)
-          
-          // ローカルストレージに保存
-          localStorage.setItem('invoicy_app_folder_id', existingFolder.id)
-          console.log('💾 Existing folder ID saved to localStorage')
-          
-          // サブフォルダの確認・作成
-          await ensureSubFolders(token, existingFolder.id)
-          
-          return existingFolder
-        }
+        // ローカルストレージに保存
+        localStorage.setItem(STORAGE_KEYS.APP_FOLDER_ID, existingFolder.id)
+        console.log('💾 Existing folder ID saved to localStorage')
+        
+        // サブフォルダの確認・作成
+        await ensureSubFolders(token, existingFolder.id)
+        
+        return existingFolder
       }
       
       // ローカルストレージからフォルダIDを確認
-      const savedFolderId = localStorage.getItem('invoicy_app_folder_id')
+      const savedFolderId = localStorage.getItem(STORAGE_KEYS.APP_FOLDER_ID)
       
       if (savedFolderId) {
         console.log('🔍 Verifying saved folder ID:', savedFolderId)
         
         // 保存されたフォルダIDの存在確認
-        const verifyResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
+        const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+        const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
         
         if (verifyResponse.ok) {
           const folderInfo = await verifyResponse.json()
@@ -435,50 +410,22 @@ export const useAuthStore = defineStore('auth', () => {
             return { id: savedFolderId }
           } else {
             console.log('⚠️ Saved folder is trashed or has wrong name, removing from localStorage')
-            localStorage.removeItem('invoicy_app_folder_id')
+            localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
           }
         } else {
           console.log('⚠️ Saved folder ID is invalid, removing from localStorage')
-          localStorage.removeItem('invoicy_app_folder_id')
+          localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
         }
       }
       
       // フォルダIDがない場合または無効な場合は新規作成
       console.log('📁 Creating new app folder...')
-      const createPayload = {
-        name: APP_FOLDER_NAME,
-        mimeType: 'application/vnd.google-apps.folder'
-      }
-      console.log('📦 Create payload:', createPayload)
-      
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(createPayload)
-      })
-      
-      console.log('📡 Create response status:', createResponse.status)
-      console.log('📡 Create response ok:', createResponse.ok)
-      
-      if (!createResponse.ok) {
-        const errorText = await createResponse.text()
-        console.error('❌ Create response error:', {
-          status: createResponse.status,
-          statusText: createResponse.statusText,
-          errorText: errorText
-        })
-        throw new Error(`アプリフォルダの作成に失敗しました: ${createResponse.status} ${createResponse.statusText}`)
-      }
-      
-      const newFolder = await createResponse.json()
+      const newFolder = await googleApiClient.createFolder(token, APP_FOLDER_NAME)
       console.log('✅ App folder created:', newFolder.id)
       console.log('📄 Create response data:', newFolder)
       
       // フォルダIDをローカルストレージに保存
-      localStorage.setItem('invoicy_app_folder_id', newFolder.id)
+      localStorage.setItem(STORAGE_KEYS.APP_FOLDER_ID, newFolder.id)
       console.log('💾 Folder ID saved to localStorage')
       
       // サブフォルダの作成
@@ -525,41 +472,29 @@ export const useAuthStore = defineStore('auth', () => {
       console.log(`🔍 Checking ${folderName} folder...`)
       
       // 既存のフォルダを検索
-      const searchQuery = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`
-      const searchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name)`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const searchResult = await googleApiClient.searchFolder(token, folderName, parentFolderId)
+      console.log(`📄 ${folderName} folder search result:`, searchResult)
       
-      if (searchResponse.ok) {
-        const searchResult = await searchResponse.json()
-        console.log(`📄 ${folderName} folder search result:`, searchResult)
+      if (searchResult.files && searchResult.files.length > 0) {
+        const existingFolder = searchResult.files[0]
+        console.log(`✅ Found existing ${folderName} folder:`, existingFolder.id)
         
-        if (searchResult.files && searchResult.files.length > 0) {
-          const existingFolder = searchResult.files[0]
-          console.log(`✅ Found existing ${folderName} folder:`, existingFolder.id)
-          
-          // ローカルストレージに保存
-          localStorage.setItem(`invoicy_${folderName}_folder_id`, existingFolder.id)
-          console.log(`💾 ${folderName} folder ID saved to localStorage`)
-          
-          return existingFolder
-        }
+        // ローカルストレージに保存
+        localStorage.setItem(getSubFolderStorageKey(folderName), existingFolder.id)
+        console.log(`💾 ${folderName} folder ID saved to localStorage`)
+        
+        return existingFolder
       }
       
       // ローカルストレージからフォルダIDを確認
-      const savedFolderId = localStorage.getItem(`invoicy_${folderName}_folder_id`)
+      const savedFolderId = localStorage.getItem(getSubFolderStorageKey(folderName))
       
       if (savedFolderId) {
         console.log(`🔍 Verifying saved ${folderName} folder ID:`, savedFolderId)
         
         // 保存されたフォルダIDの存在確認
-        const verifyResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
+        const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+        const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
         
         if (verifyResponse.ok) {
           const folderInfo = await verifyResponse.json()
@@ -568,51 +503,22 @@ export const useAuthStore = defineStore('auth', () => {
             return { id: savedFolderId }
           } else {
             console.log(`⚠️ Saved ${folderName} folder is trashed or has wrong name, removing from localStorage`)
-            localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+            localStorage.removeItem(getSubFolderStorageKey(folderName))
           }
         } else {
           console.log(`⚠️ Saved ${folderName} folder ID is invalid, removing from localStorage`)
-          localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+          localStorage.removeItem(getSubFolderStorageKey(folderName))
         }
       }
       
       // フォルダがない場合は新規作成
       console.log(`📁 Creating new ${folderName} folder...`)
-      const createPayload = {
-        name: folderName,
-        mimeType: 'application/vnd.google-apps.folder',
-        parents: [parentFolderId]
-      }
-      console.log(`📦 ${folderName} folder create payload:`, createPayload)
-      
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(createPayload)
-      })
-      
-      console.log(`📡 ${folderName} folder create response status:`, createResponse.status)
-      console.log(`📡 ${folderName} folder create response ok:`, createResponse.ok)
-      
-      if (!createResponse.ok) {
-        const errorText = await createResponse.text()
-        console.error(`❌ ${folderName} folder create response error:`, {
-          status: createResponse.status,
-          statusText: createResponse.statusText,
-          errorText: errorText
-        })
-        throw new Error(`${folderName}フォルダの作成に失敗しました: ${createResponse.status} ${createResponse.statusText}`)
-      }
-      
-      const newFolder = await createResponse.json()
+      const newFolder = await googleApiClient.createFolder(token, folderName, parentFolderId)
       console.log(`✅ ${folderName} folder created:`, newFolder.id)
       console.log(`📄 ${folderName} folder create response data:`, newFolder)
       
       // フォルダIDをローカルストレージに保存
-      localStorage.setItem(`invoicy_${folderName}_folder_id`, newFolder.id)
+      localStorage.setItem(getSubFolderStorageKey(folderName), newFolder.id)
       console.log(`💾 ${folderName} folder ID saved to localStorage`)
       
       return newFolder
@@ -635,7 +541,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     
     // ローカルストレージからフォルダIDを取得
-    const savedFolderId = localStorage.getItem('invoicy_app_folder_id')
+    const savedFolderId = localStorage.getItem(STORAGE_KEYS.APP_FOLDER_ID)
     
     if (!savedFolderId) {
       throw new Error('アプリフォルダIDが保存されていません。ログインしてください。')
@@ -643,11 +549,8 @@ export const useAuthStore = defineStore('auth', () => {
     
     // フォルダIDの有効性を検証
     try {
-      const verifyResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+      const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
       
       if (verifyResponse.ok) {
         const folderInfo = await verifyResponse.json()
@@ -656,17 +559,17 @@ export const useAuthStore = defineStore('auth', () => {
           return { id: savedFolderId }
         } else {
           console.log('⚠️ Saved folder is trashed or has wrong name')
-          localStorage.removeItem('invoicy_app_folder_id')
+          localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
           throw new Error('保存されたフォルダが無効です。ログインしてください。')
         }
       } else {
         console.log('⚠️ Saved folder ID is invalid')
-        localStorage.removeItem('invoicy_app_folder_id')
+        localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
         throw new Error('保存されたフォルダが見つかりません。ログインしてください。')
       }
     } catch (err) {
       console.error('Failed to verify folder ID:', err)
-      localStorage.removeItem('invoicy_app_folder_id')
+      localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
       throw new Error('フォルダの検証に失敗しました。ログインしてください。')
     }
   }
@@ -684,7 +587,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     
     // ローカルストレージからフォルダIDを取得
-    const savedFolderId = localStorage.getItem(`invoicy_${folderName}_folder_id`)
+    const savedFolderId = localStorage.getItem(getSubFolderStorageKey(folderName))
     
     if (!savedFolderId) {
       throw new Error(`${folderName}フォルダIDが保存されていません。ログインしてください。`)
@@ -692,11 +595,8 @@ export const useAuthStore = defineStore('auth', () => {
     
     // フォルダIDの有効性を検証
     try {
-      const verifyResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+      const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
       
       if (verifyResponse.ok) {
         const folderInfo = await verifyResponse.json()
@@ -705,17 +605,17 @@ export const useAuthStore = defineStore('auth', () => {
           return { id: savedFolderId }
         } else {
           console.log(`⚠️ Saved ${folderName} folder is trashed or has wrong name`)
-          localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+          localStorage.removeItem(getSubFolderStorageKey(folderName))
           throw new Error(`保存された${folderName}フォルダが無効です。ログインしてください。`)
         }
       } else {
         console.log(`⚠️ Saved ${folderName} folder ID is invalid`)
-        localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+        localStorage.removeItem(getSubFolderStorageKey(folderName))
         throw new Error(`保存された${folderName}フォルダが見つかりません。ログインしてください。`)
       }
     } catch (err) {
       console.error(`Failed to verify ${folderName} folder ID:`, err)
-      localStorage.removeItem(`invoicy_${folderName}_folder_id`)
+      localStorage.removeItem(getSubFolderStorageKey(folderName))
       throw new Error(`${folderName}フォルダの検証に失敗しました。ログインしてください。`)
     }
   }

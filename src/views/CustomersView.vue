@@ -228,7 +228,7 @@ const handleBulkSubmit = async (customersData) => {
     isSubmitting.value = true
     setLoading(true, '一括登録中...', `${customersData.length}件の顧客を登録しています`)
     
-    await customersStore.createBulkCustomers(customersData)
+    await customersStore.bulkCreateCustomers(customersData)
     showSuccessMessage(`${customersData.length}件の顧客を登録しました`)
     
     closeBulkCreateForm()

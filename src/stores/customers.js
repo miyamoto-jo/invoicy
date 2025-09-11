@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
+import { APP_CONFIG } from '../config/api.js'
+import { googleApiClient } from '../services/googleApi.js'
 
 export const useCustomersStore = defineStore('customers', () => {
   // State
@@ -18,7 +20,7 @@ export const useCustomersStore = defineStore('customers', () => {
   })
   
   // Google Drive API設定
-  const CUSTOMERS_FILE = 'masters/customers.jsonl'
+  const CUSTOMERS_FILE = `masters/${APP_CONFIG.FILES.CUSTOMERS}`
   
   // Actions
   const initializeCustomers = async () => {
@@ -50,7 +52,7 @@ export const useCustomersStore = defineStore('customers', () => {
       const customersFile = await getOrCreateCustomersFile(token, appFolder.id)
       
       // ファイルの内容を取得
-      const content = await getFileContent(token, customersFile.id)
+      const content = await googleApiClient.getFileContent(token, customersFile.id)
       
       if (content && typeof content === 'string' && content.trim()) {
         // JSONL形式の文字列を行ごとにパース
@@ -367,46 +369,23 @@ export const useCustomersStore = defineStore('customers', () => {
       const mastersFolder = await getOrCreateFolder(token, appFolderId, 'masters')
       
       // customers.jsonlファイルを検索
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='customers.jsonl' and '${mastersFolder.id}' in parents and trashed=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
+      const query = `name='${APP_CONFIG.FILES.CUSTOMERS}' and '${mastersFolder.id}' in parents and trashed=false`
+      const searchResult = await googleApiClient.searchFiles(token, query)
       
-      if (!response.ok) {
-        throw new Error('ファイルの検索に失敗しました')
-      }
-      
-      const data = await response.json()
-      
-      if (data.files && data.files.length > 0) {
-        return data.files[0]
+      if (searchResult.files && searchResult.files.length > 0) {
+        return searchResult.files[0]
       }
       
       // customers.jsonlファイルを作成
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: 'customers.jsonl',
-          parents: [mastersFolder.id]
-        })
-      })
-      
-      if (!createResponse.ok) {
-        throw new Error('ファイルの作成に失敗しました')
+      const fileData = {
+        name: APP_CONFIG.FILES.CUSTOMERS,
+        parents: [mastersFolder.id]
       }
-      
+      const createResponse = await googleApiClient.createFile(token, fileData)
       const file = await createResponse.json()
       
       // 初期データ（空のJSONLファイル）を設定
-      await updateFileContent(token, file.id, '')
+      await googleApiClient.updateFileContent(token, file.id, '')
       
       return file
       
@@ -424,7 +403,7 @@ export const useCustomersStore = defineStore('customers', () => {
       
       // ファイルの内容を更新（JSONL形式）
       const jsonlContent = customers.value.map(customer => JSON.stringify(customer)).join('\n')
-      await updateFileContent(token, customersFile.id, jsonlContent)
+      await googleApiClient.updateFileContent(token, customersFile.id, jsonlContent)
       
     } catch (err) {
       console.error('Failed to save customers to file:', err)
@@ -435,44 +414,14 @@ export const useCustomersStore = defineStore('customers', () => {
   const getOrCreateFolder = async (token, parentId, folderName) => {
     try {
       // フォルダを検索
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
+      const searchResult = await googleApiClient.searchFolder(token, folderName, parentId)
       
-      if (!response.ok) {
-        throw new Error('フォルダの検索に失敗しました')
-      }
-      
-      const data = await response.json()
-      
-      if (data.files && data.files.length > 0) {
-        return data.files[0]
+      if (searchResult.files && searchResult.files.length > 0) {
+        return searchResult.files[0]
       }
       
       // フォルダを作成
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: folderName,
-          mimeType: 'application/vnd.google-apps.folder',
-          parents: [parentId]
-        })
-      })
-      
-      if (!createResponse.ok) {
-        throw new Error('フォルダの作成に失敗しました')
-      }
-      
-      return await createResponse.json()
+      return await googleApiClient.createFolder(token, folderName, parentId)
       
     } catch (err) {
       console.error('Failed to get or create folder:', err)
@@ -480,48 +429,6 @@ export const useCustomersStore = defineStore('customers', () => {
     }
   }
   
-  const updateFileContent = async (token, fileId, content) => {
-    try {
-      const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(content)
-      })
-      
-      if (!response.ok) {
-        throw new Error('ファイル内容の更新に失敗しました')
-      }
-      
-      return await response.json()
-      
-    } catch (err) {
-      console.error('Failed to update file content:', err)
-      throw err
-    }
-  }
-  
-  const getFileContent = async (token, fileId) => {
-    try {
-      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error('ファイル内容の取得に失敗しました')
-      }
-      
-      return await response.json()
-      
-    } catch (err) {
-      console.error('Failed to get file content:', err)
-      throw err
-    }
-  }
   
   return {
     // State

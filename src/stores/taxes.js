@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
+import { APP_CONFIG } from '../config/api.js'
+import { googleApiClient } from '../services/googleApi.js'
 
 export const useTaxesStore = defineStore('taxes', () => {
   // State
@@ -25,7 +27,7 @@ export const useTaxesStore = defineStore('taxes', () => {
   })
   
   // Google Drive API設定
-  const TAXES_FILE = 'masters/taxes.json'
+  const TAXES_FILE = `masters/${APP_CONFIG.FILES.TAXES}`
   
   // Actions
   const initializeTaxes = async () => {
@@ -57,7 +59,7 @@ export const useTaxesStore = defineStore('taxes', () => {
       const taxesFile = await getOrCreateTaxesFile(token, appFolder.id)
       
       // ファイルの内容を取得
-      const content = await getFileContent(token, taxesFile.id)
+      const content = await googleApiClient.getFileContent(token, taxesFile.id)
       
       if (content && Array.isArray(content)) {
         taxes.value = content
@@ -222,45 +224,14 @@ export const useTaxesStore = defineStore('taxes', () => {
   const getOrCreateMastersFolder = async (token, appFolderId) => {
     try {
       // 既存のmastersフォルダを検索
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='masters' and '${appFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
+      const searchResult = await googleApiClient.searchFolder(token, APP_CONFIG.SUB_FOLDERS[0], appFolderId)
       
-      if (!response.ok) {
-        throw new Error('Google Drive API request failed')
-      }
-      
-      const data = await response.json()
-      
-      if (data.files && data.files.length > 0) {
-        return data.files[0]
+      if (searchResult.files && searchResult.files.length > 0) {
+        return searchResult.files[0]
       }
       
       // mastersフォルダが存在しない場合は作成
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: 'masters',
-          parents: [appFolderId],
-          mimeType: 'application/vnd.google-apps.folder'
-        })
-      })
-      
-      if (!createResponse.ok) {
-        throw new Error('Failed to create masters folder')
-      }
-      
-      return await createResponse.json()
+      return await googleApiClient.createFolder(token, APP_CONFIG.SUB_FOLDERS[0], appFolderId)
       
     } catch (err) {
       console.error('Failed to get or create masters folder:', err)
@@ -274,44 +245,20 @@ export const useTaxesStore = defineStore('taxes', () => {
       const mastersFolder = await getOrCreateMastersFolder(token, appFolderId)
       
       // 既存のtaxes.jsonファイルを検索
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='taxes.json' and '${mastersFolder.id}' in parents and trashed=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
+      const query = `name='${APP_CONFIG.FILES.TAXES}' and '${mastersFolder.id}' in parents and trashed=false`
+      const searchResult = await googleApiClient.searchFiles(token, query)
       
-      if (!response.ok) {
-        throw new Error('Google Drive API request failed')
-      }
-      
-      const data = await response.json()
-      
-      if (data.files && data.files.length > 0) {
-        return data.files[0]
+      if (searchResult.files && searchResult.files.length > 0) {
+        return searchResult.files[0]
       }
       
       // ファイルが存在しない場合は作成
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: 'taxes.json',
-          parents: [mastersFolder.id],
-          mimeType: 'application/json'
-        })
-      })
-      
-      if (!createResponse.ok) {
-        throw new Error('Failed to create taxes file')
+      const fileData = {
+        name: APP_CONFIG.FILES.TAXES,
+        parents: [mastersFolder.id],
+        mimeType: 'application/json'
       }
-      
+      const createResponse = await googleApiClient.createFile(token, fileData)
       const newFile = await createResponse.json()
       
       // 初期データで初期化
@@ -349,7 +296,7 @@ export const useTaxesStore = defineStore('taxes', () => {
         lastUpdated: new Date().toISOString()
       }
       
-      await updateFileContent(token, newFile.id, initialData)
+      await googleApiClient.updateFileContent(token, newFile.id, initialData)
       
       return newFile
       
@@ -359,56 +306,6 @@ export const useTaxesStore = defineStore('taxes', () => {
     }
   }
   
-  const getFileContent = async (token, fileId) => {
-    try {
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          return []
-        }
-        throw new Error('Failed to get file content')
-      }
-      
-      const content = await response.text()
-      return content ? JSON.parse(content) : []
-      
-    } catch (err) {
-      console.error('Failed to get file content:', err)
-      throw err
-    }
-  }
-  
-  const updateFileContent = async (token, fileId, content) => {
-    try {
-      const response = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(content)
-        }
-      )
-      
-      if (!response.ok) {
-        throw new Error('Failed to update file content')
-      }
-      
-    } catch (err) {
-      console.error('Failed to update file content:', err)
-      throw err
-    }
-  }
   
   const saveTaxesToFile = async (token) => {
     try {
@@ -424,7 +321,7 @@ export const useTaxesStore = defineStore('taxes', () => {
         lastUpdated: new Date().toISOString()
       }
       
-      await updateFileContent(token, taxesFile.id, taxesData)
+      await googleApiClient.updateFileContent(token, taxesFile.id, taxesData)
     } catch (err) {
       console.error('Failed to save taxes to file:', err)
       throw err
@@ -436,7 +333,7 @@ export const useTaxesStore = defineStore('taxes', () => {
     try {
       // taxes.jsonファイルを取得
       const taxesFile = await getOrCreateTaxesFile(token, appFolderId)
-      const content = await getFileContent(token, taxesFile.id)
+      const content = await googleApiClient.getFileContent(token, taxesFile.id)
       
       if (content && typeof content === 'object' && !Array.isArray(content)) {
         // オブジェクト形式の場合（新しい形式）
@@ -489,7 +386,7 @@ export const useTaxesStore = defineStore('taxes', () => {
       }
       
       // ファイルを更新
-      await updateFileContent(token, taxesFile.id, taxesData)
+      await googleApiClient.updateFileContent(token, taxesFile.id, taxesData)
       
       // ローカル状態を更新
       rounding.value = newRounding

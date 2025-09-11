@@ -10,7 +10,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { useSettingsStore } from '../stores/settings'
+import { useSettingsStore } from '../stores/setting'
 import { useRouter } from 'vue-router'
 import { useLoading } from '../composables/useLoading'
 import AppLayout from '../components/AppLayout.vue'

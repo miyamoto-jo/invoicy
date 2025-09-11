@@ -45,7 +45,7 @@ export const APP_CONFIG = {
     CUSTOMERS: 'customers.jsonl',
     PRODUCTS: 'products.jsonl',
     TAXES: 'taxes.json',
-    SETTINGS: 'settings.json'
+    SETTING: 'setting.json'
   }
 }
 

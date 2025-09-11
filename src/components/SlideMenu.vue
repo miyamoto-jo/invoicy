@@ -115,7 +115,7 @@
 <script setup>
 import { ref, watch, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { useSettingsStore } from '../stores/settings'
+import { useSettingsStore } from '../stores/setting'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({

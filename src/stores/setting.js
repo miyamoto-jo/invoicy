@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { useAuthStore } from './auth'
+import { useAuthStore } from './auth.js'
+import { APP_CONFIG } from '../config/api.js'
+import { googleApiClient } from '../services/googleApi.js'
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -79,18 +81,8 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       
       // setting.jsonファイルを検索
-      const searchQuery = `name='setting.json' and '${appFolder.id}' in parents and trashed=false`
-      const searchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name)`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (!searchResponse.ok) {
-        throw new Error('設定ファイルの検索に失敗しました')
-      }
-      
-      const searchResult = await searchResponse.json()
+      const searchQuery = `name='${APP_CONFIG.FILES.SETTING}' and '${appFolder.id}' in parents and trashed=false`
+      const searchResult = await googleApiClient.searchFiles(token, searchQuery, 'files(id,name)')
       
       if (searchResult.files && searchResult.files.length > 0) {
         // 既存の設定ファイルを取得
@@ -110,17 +102,7 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const loadSettingsFromFile = async (token, fileId) => {
     try {
-      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error('設定ファイルの読み込みに失敗しました')
-      }
-      
-      const settingsData = await response.json()
+      const settingsData = await googleApiClient.getFileContent(token, fileId)
       
       // 必要な情報のみを抽出
       const essentialSettings = {
@@ -192,44 +174,19 @@ export const useSettingsStore = defineStore('settings', () => {
       // setting.jsonファイルを作成
       const appFolder = await authStore.ensureAppFolder(token)
       
-      const createPayload = {
-        name: 'setting.json',
+      const fileData = {
+        name: APP_CONFIG.FILES.SETTING,
         parents: [appFolder.id],
         mimeType: 'application/json'
       }
       
-      // まずファイルのメタデータを作成
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(createPayload)
-      })
-      
-      if (!createResponse.ok) {
-        const errorText = await createResponse.text()
-        throw new Error(`設定ファイルの作成に失敗しました: ${createResponse.status} ${createResponse.statusText}`)
-      }
-      
+      // ファイルを作成
+      const createResponse = await googleApiClient.createFile(token, fileData)
       const createdFile = await createResponse.json()
       console.log('Settings file created:', createdFile.id)
       
       // ファイルの内容を更新
-      const updateContentResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${createdFile.id}?uploadType=media`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settingsData)
-      })
-      
-      if (!updateContentResponse.ok) {
-        const errorText = await updateContentResponse.text()
-        throw new Error(`設定ファイルの内容更新に失敗しました: ${updateContentResponse.status} ${updateContentResponse.statusText}`)
-      }
+      await googleApiClient.updateFileContent(token, createdFile.id, settingsData)
       
       console.log('Business settings created successfully and cached')
       
@@ -261,18 +218,8 @@ export const useSettingsStore = defineStore('settings', () => {
       
       // 既存の設定ファイルを検索
       const appFolder = await authStore.ensureAppFolder(token)
-      const searchQuery = `name='setting.json' and '${appFolder.id}' in parents and trashed=false`
-      const searchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name)`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (!searchResponse.ok) {
-        throw new Error('設定ファイルの検索に失敗しました')
-      }
-      
-      const searchResult = await searchResponse.json()
+      const searchQuery = `name='${APP_CONFIG.FILES.SETTING}' and '${appFolder.id}' in parents and trashed=false`
+      const searchResult = await googleApiClient.searchFiles(token, searchQuery, 'files(id,name)')
       
       if (!searchResult.files || searchResult.files.length === 0) {
         throw new Error('設定ファイルが見つかりません')
@@ -301,22 +248,8 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       
       // ファイルの内容を更新
-      const updateResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settingsData)
-      })
-      
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text()
-        throw new Error(`設定ファイルの更新に失敗しました: ${updateResponse.status} ${updateResponse.statusText} ${errorText}`)
-      }
-      
-      const updatedFile = await updateResponse.json()
-      console.log('Settings file updated:', updatedFile.id)
+      await googleApiClient.updateFileContent(token, fileId, settingsData)
+      console.log('Settings file updated:', fileId)
 
       // ローカルストレージに保存
       authStore.saveToLocalStorage(authStore.STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
@@ -324,10 +257,10 @@ export const useSettingsStore = defineStore('settings', () => {
       // 状態を更新
       businessSettings.value = settingsData
       
-      return updatedFile
+      return { id: fileId }
       
     } catch (err) {
-      console.error('Failed to update business settings:', err)
+      console.error('Failed to update business setting:', err)
       error.value = err.message
       throw err
     } finally {

@@ -346,7 +346,7 @@ export const useAuthStore = defineStore('auth', () => {
       
       // 設定ストアもリセット
       try {
-        const { useSettingsStore } = await import('../stores/settings')
+        const { useSettingsStore } = await import('./setting.js')
         const settingsStore = useSettingsStore()
         settingsStore.resetSettings()
       } catch (err) {

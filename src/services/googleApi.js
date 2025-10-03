@@ -47,6 +47,10 @@ export class GoogleApiClient {
     return `${this.config.DRIVE.UPLOAD_FILES}/${fileId}?uploadType=${uploadType}`
   }
 
+  getDriveAboutUrl() {
+    return `${this.config.DRIVE.ABOUT}?fields=storageQuota`
+  }
+
   /**
    * 認証スコープ
    */
@@ -55,7 +59,8 @@ export class GoogleApiClient {
       this.config.SCOPES.OPENID,
       this.config.SCOPES.EMAIL,
       this.config.SCOPES.PROFILE,
-      this.config.SCOPES.DRIVE_FILE
+      this.config.SCOPES.DRIVE_FILE,
+      this.config.SCOPES.DRIVE_METADATA
     ].join(' ')
   }
 

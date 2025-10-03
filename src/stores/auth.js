@@ -31,6 +31,36 @@ export const useAuthStore = defineStore('auth', () => {
   // Local storage utilities
   const { saveToLocalStorage, loadFromLocalStorage, clearAppData } = useStorage()
   
+  // 容量情報の計算ヘルパー関数
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+  
+  const getStorageInfo = (storageQuota) => {
+    if (!storageQuota) return null
+    
+    const limit = parseInt(storageQuota.limit) || 0
+    const usage = parseInt(storageQuota.usage) || 0
+    const remaining = limit - usage
+    const usageRate = limit > 0 ? (usage / limit) * 100 : 0
+    
+    return {
+      limit: limit,
+      usage: usage,
+      remaining: remaining,
+      usageRate: usageRate,
+      limitFormatted: formatBytes(limit),
+      usageFormatted: formatBytes(usage),
+      remainingFormatted: formatBytes(remaining),
+      isNearLimit: usageRate > 80,
+      isOverLimit: usageRate >= 100
+    }
+  }
+  
   // Actions
   const initializeAuth = async () => {
     try {
@@ -160,15 +190,49 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('👤 Fetching user info with token...')
       console.log('🔑 Token available:', !!token)
       
-      const url = googleApiClient.getUserInfoUrl()
-      const response = await googleApiClient.makeAuthenticatedRequest(url, token)
+      // ユーザー情報を取得
+      const userInfoResponse = await googleApiClient.makeAuthenticatedRequest(googleApiClient.getUserInfoUrl(), token)
       
-      console.log('📡 User info response status:', response.status)
-      console.log('📡 User info response ok:', response.ok)
+      // Drive容量情報を取得（失敗してもアプリは動作する）
+      let driveInfo = null
+      try {
+        const driveInfoResponse = await googleApiClient.makeAuthenticatedRequest(googleApiClient.getDriveAboutUrl(), token)
+        if (driveInfoResponse.ok) {
+          driveInfo = await driveInfoResponse.json()
+          console.log('📄 Drive info response data:', driveInfo)
+        } else {
+          console.warn('⚠️ Drive info response failed:', driveInfoResponse.status, driveInfoResponse.statusText)
+        }
+      } catch (driveError) {
+        console.warn('⚠️ Drive info fetch failed:', driveError.message)
+      }
       
-      if (response.ok) {
-        const userInfo = await response.json()
+      console.log('📡 User info response status:', userInfoResponse.status)
+      console.log('📡 User info response ok:', userInfoResponse.ok)
+      
+      if (userInfoResponse.ok) {
+        const userInfo = await userInfoResponse.json()
         console.log('📄 User info response data:', userInfo)
+        
+        // 容量情報の計算（取得できた場合のみ）
+        let storageQuota = null
+        if (driveInfo && driveInfo.storageQuota) {
+          const quota = driveInfo.storageQuota
+          const limit = parseInt(quota.limit) || 0
+          const usage = parseInt(quota.usage) || 0
+          const usageInDrive = parseInt(quota.usageInDrive) || 0
+          const usageInDriveTrash = parseInt(quota.usageInDriveTrash) || 0
+          const remaining = limit - usage
+          
+          storageQuota = {
+            limit: limit,
+            usage: usage,
+            usage_in_drive: usageInDrive,
+            usage_in_drive_trash: usageInDriveTrash,
+            remaining: remaining,
+            usage_rate: limit > 0 ? (usage / limit) * 100 : 0
+          }
+        }
         
         // 必要な情報のみを抽出
         const essentialUserInfo = {
@@ -177,7 +241,9 @@ export const useAuthStore = defineStore('auth', () => {
           name: userInfo.name,
           picture: userInfo.picture,
           given_name: userInfo.given_name,
-          family_name: userInfo.family_name
+          family_name: userInfo.family_name,
+          // 容量情報（取得できた場合のみ）
+          ...(storageQuota && { storage_quota: storageQuota })
         }
         
         user.value = essentialUserInfo
@@ -188,14 +254,19 @@ export const useAuthStore = defineStore('auth', () => {
         saveToLocalStorage(STORAGE_KEYS.USER_INFO, essentialUserInfo)
         
         console.log('✅ User info set successfully and cached')
+        if (storageQuota) {
+          console.log('💾 Storage quota info:', storageQuota)
+        } else {
+          console.log('⚠️ Storage quota info not available')
+        }
       } else {
-        const errorText = await response.text()
+        const userErrorText = await userInfoResponse.text()
         console.error('❌ User info response error:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText: errorText
+          status: userInfoResponse.status,
+          statusText: userInfoResponse.statusText,
+          errorText: userErrorText
         })
-        throw new Error(`ユーザー情報の取得に失敗しました: ${response.status} ${response.statusText}`)
+        throw new Error(`ユーザー情報の取得に失敗しました: ${userInfoResponse.status} ${userInfoResponse.statusText}`)
       }
     } catch (err) {
       console.error('❌ User info fetch error:', {
@@ -612,6 +683,10 @@ export const useAuthStore = defineStore('auth', () => {
     ensureAppFolder,
     getAppFolderId,
     getSubFolderId,
+    
+    // Storage utilities
+    formatBytes,
+    getStorageInfo,
     
     // Local storage utilities (for backward compatibility)
     saveToLocalStorage,

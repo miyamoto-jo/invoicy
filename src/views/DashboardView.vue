@@ -26,7 +26,19 @@
     
     <!-- データ保存容量セクション -->
     <div class="storage-section" v-if="authStore.user?.storage_quota">
-      <h3 class="storage-title">データ保存容量</h3>
+      <div class="storage-header">
+        <h3 class="storage-title">
+          データ保存容量
+          <span 
+            @click="refreshStorageInfo" 
+            class="refresh-icon"
+            :class="{ 'refreshing': isRefreshing }"
+            :title="isRefreshing ? '更新中...' : '容量情報を更新'"
+          >
+            🔄
+          </span>
+        </h3>
+      </div>
       <div class="storage-container">
         <div class="storage-info">
           <div class="storage-item">
@@ -72,7 +84,7 @@
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/setting'
 import { useRouter } from 'vue-router'
@@ -83,6 +95,9 @@ const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const router = useRouter()
 const { setLoading, clearLoading } = useLoading()
+
+// 再読み込み状態
+const isRefreshing = ref(false)
 
 // 容量情報のcomputed
 const usageRate = computed(() => {
@@ -110,6 +125,76 @@ const formatBytes = (bytes) => {
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+// 容量情報の再読み込み
+const refreshStorageInfo = async () => {
+  try {
+    isRefreshing.value = true
+    console.log('🔄 Refreshing storage info...')
+    
+    const token = authStore.getAccessToken()
+    if (!token) {
+      console.error('❌ No access token available')
+      return
+    }
+    
+    // Google Drive APIから容量情報を取得
+    const { googleApiClient } = await import('../services/googleApi.js')
+    const driveInfoResponse = await googleApiClient.makeAuthenticatedRequest(
+      googleApiClient.getDriveAboutUrl(), 
+      token
+    )
+    
+    if (driveInfoResponse.ok) {
+      const driveInfo = await driveInfoResponse.json()
+      console.log('📄 Updated drive info:', driveInfo)
+      
+      // 容量情報の計算
+      if (driveInfo.storageQuota) {
+        const quota = driveInfo.storageQuota
+        const limit = parseInt(quota.limit) || 0
+        const usage = parseInt(quota.usage) || 0
+        const usageInDrive = parseInt(quota.usageInDrive) || 0
+        const usageInDriveTrash = parseInt(quota.usageInDriveTrash) || 0
+        const remaining = limit - usage
+        
+        const updatedStorageQuota = {
+          limit: limit,
+          usage: usage,
+          usage_in_drive: usageInDrive,
+          usage_in_drive_trash: usageInDriveTrash,
+          remaining: remaining,
+          usage_rate: limit > 0 ? (usage / limit) * 100 : 0
+        }
+        
+        // ユーザー情報を更新
+        const updatedUser = {
+          ...authStore.user,
+          storage_quota: updatedStorageQuota
+        }
+        
+        authStore.user = updatedUser
+        
+        // ローカルストレージに保存
+        const { useStorage } = await import('../composables/useStorage.js')
+        const { saveToLocalStorage } = useStorage()
+        const { STORAGE_KEYS } = await import('../config/api.js')
+        saveToLocalStorage(STORAGE_KEYS.USER_INFO, updatedUser)
+        
+        console.log('✅ Storage info updated successfully')
+      } else {
+        console.warn('⚠️ No storage quota information in response')
+      }
+    } else {
+      console.error('❌ Failed to fetch storage info:', driveInfoResponse.status, driveInfoResponse.statusText)
+    }
+    
+  } catch (err) {
+    console.error('❌ Failed to refresh storage info:', err)
+  } finally {
+    isRefreshing.value = false
+  }
 }
 
 // ナビゲーション関数
@@ -287,12 +372,47 @@ onMounted(async () => {
   margin-bottom: 2rem;
 }
 
+.storage-header {
+  margin-bottom: 1rem;
+}
+
 .storage-title {
   font-size: 1.5rem;
   font-weight: bold;
   color: #333;
-  text-align: center;
-  margin-bottom: 1rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.refresh-icon {
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0.25rem;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.refresh-icon:hover:not(.refreshing) {
+  background-color: #f8f9fa;
+  transform: scale(1.1);
+}
+
+.refresh-icon.refreshing {
+  animation: spin 1s linear infinite;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .storage-container {
@@ -421,6 +541,10 @@ onMounted(async () => {
 
 /* レスポンシブデザイン */
 @media (max-width: 768px) {
+  .storage-title {
+    justify-content: center;
+  }
+  
   .storage-info {
     flex-direction: column;
     gap: 1rem;

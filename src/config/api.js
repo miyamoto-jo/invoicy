@@ -19,7 +19,8 @@ export const API_CONFIG = {
       BASE_URL: `${GOOGLE_API_BASE}/drive/v3`,
       UPLOAD_URL: `${GOOGLE_API_BASE}/upload/drive/v3`,
       FILES: `${GOOGLE_API_BASE}/drive/v3/files`,
-      UPLOAD_FILES: `${GOOGLE_API_BASE}/upload/drive/v3/files`
+      UPLOAD_FILES: `${GOOGLE_API_BASE}/upload/drive/v3/files`,
+      ABOUT: `${GOOGLE_API_BASE}/drive/v3/about`
     },
     
     // 認証スコープ
@@ -27,7 +28,8 @@ export const API_CONFIG = {
       OPENID: 'openid',
       EMAIL: 'email',
       PROFILE: 'profile',
-      DRIVE_FILE: `${GOOGLE_API_BASE}/auth/drive.file`
+      DRIVE_FILE: `${GOOGLE_API_BASE}/auth/drive.file`,
+      DRIVE_METADATA: `${GOOGLE_API_BASE}/auth/drive.metadata.readonly`
     }
   }
 }

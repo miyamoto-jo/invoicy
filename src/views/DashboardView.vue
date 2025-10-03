@@ -23,11 +23,56 @@
         </button>
       </div>
     </div>
+    
+    <!-- データ保存容量セクション -->
+    <div class="storage-section" v-if="authStore.user?.storage_quota">
+      <h3 class="storage-title">データ保存容量</h3>
+      <div class="storage-container">
+        <div class="storage-info">
+          <div class="storage-item">
+            <span class="storage-label">総容量:</span>
+            <span class="storage-value">{{ formatBytes(authStore.user.storage_quota.limit) }}</span>
+          </div>
+          <div class="storage-item">
+            <span class="storage-label">使用量:</span>
+            <span class="storage-value">{{ formatBytes(authStore.user.storage_quota.usage) }}</span>
+          </div>
+          <div class="storage-item">
+            <span class="storage-label">残り容量:</span>
+            <span class="storage-value" :class="{ 'warning': isNearLimit, 'danger': isOverLimit, 'low-storage': isLowStorage }">
+              {{ formatBytes(authStore.user.storage_quota.remaining) }}
+            </span>
+          </div>
+        </div>
+        
+        <!-- プログレスバー -->
+        <div class="storage-gauge">
+          <div class="gauge-container">
+            <div class="gauge-bar">
+              <div 
+                class="gauge-fill" 
+                :class="{ 'warning': isNearLimit, 'danger': isOverLimit }"
+                :style="{ width: usageRate + '%' }"
+              ></div>
+            </div>
+            <div class="gauge-label">{{ usageRate.toFixed(1) }}% 使用中</div>
+          </div>
+        </div>
+        
+        <!-- 容量不足警告 -->
+        <div v-if="isNearLimit || isOverLimit || isLowStorage" class="storage-warning" :class="{ 'low-storage-warning': isLowStorage }">
+          <span class="warning-icon">⚠️</span>
+          <span class="warning-text">
+            {{ isOverLimit ? '容量が不足しています！' : isLowStorage ? '残り容量が3GB以下です！' : '容量が少なくなっています' }}
+          </span>
+        </div>
+      </div>
+    </div>
   </AppLayout>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/setting'
 import { useRouter } from 'vue-router'
@@ -38,6 +83,34 @@ const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const router = useRouter()
 const { setLoading, clearLoading } = useLoading()
+
+// 容量情報のcomputed
+const usageRate = computed(() => {
+  return authStore.user?.storage_quota?.usage_rate || 0
+})
+
+const isNearLimit = computed(() => {
+  return usageRate.value > 80
+})
+
+const isOverLimit = computed(() => {
+  return usageRate.value >= 100
+})
+
+const isLowStorage = computed(() => {
+  const remaining = authStore.user?.storage_quota?.remaining || 0
+  const remainingGB = remaining / (1024 * 1024 * 1024) // バイトをGBに変換
+  return remainingGB <= 3 // 3GB以下
+})
+
+// バイトを読みやすい形式に変換
+const formatBytes = (bytes) => {
+  if (!bytes || bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
 
 // ナビゲーション関数
 const navigateToSales = () => {
@@ -206,6 +279,165 @@ onMounted(async () => {
   
   .quick-action-text {
     font-size: 0.9rem;
+  }
+}
+
+/* データ保存容量セクション */
+.storage-section {
+  margin-bottom: 2rem;
+}
+
+.storage-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #333;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.storage-container {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.storage-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.storage-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 120px;
+}
+
+.storage-label {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.storage-value {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.storage-value.warning {
+  color: #f57c00;
+}
+
+.storage-value.danger {
+  color: #d32f2f;
+}
+
+.storage-value.low-storage {
+  color: #d32f2f;
+  font-weight: bold;
+}
+
+/* プログレスバー */
+.storage-gauge {
+  margin-bottom: 1rem;
+}
+
+.gauge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gauge-bar {
+  width: 100%;
+  height: 20px;
+  background-color: #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.gauge-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #8bc34a);
+  border-radius: 10px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.gauge-fill.warning {
+  background: linear-gradient(90deg, #ff9800, #ffc107);
+}
+
+.gauge-fill.danger {
+  background: linear-gradient(90deg, #f44336, #ff5722);
+}
+
+.gauge-label {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+}
+
+/* 容量不足警告 */
+.storage-warning {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  color: #856404;
+}
+
+.storage-warning.danger {
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
+.storage-warning.low-storage-warning {
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+  border-left: 4px solid #d32f2f;
+}
+
+.warning-icon {
+  font-size: 1.2rem;
+}
+
+.warning-text {
+  font-weight: 500;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+  .storage-info {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .storage-item {
+    flex-direction: row;
+    justify-content: space-between;
+    min-width: auto;
+  }
+  
+  .storage-label {
+    margin-bottom: 0;
+  }
+  
+  .storage-container {
+    padding: 1.5rem;
   }
 }
 

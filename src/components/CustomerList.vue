@@ -10,15 +10,8 @@
         />
       </div>
       <div class="header-actions">
-        <button
-          @click="$emit('bulk-create')"
-          class="btn btn-primary"
-          :disabled="isLoading"
-        >
-          📋 一括登録
-        </button>
         <div class="stats">
-          <span class="stats-text">{{ filteredCustomers.length }}件</span>
+          <span class="stats-text">顧客登録数: {{ filteredCustomers.length }}件</span>
         </div>
       </div>
     </div>
@@ -206,6 +199,7 @@ watch(searchQuery, (newQuery) => {
 .stats-text {
   color: #666;
   font-size: 14px;
+  text-align: center;
 }
 
 .loading {

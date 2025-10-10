@@ -661,30 +661,48 @@ export const useAuthStore = defineStore('auth', () => {
       throw new Error(`無効なフォルダ名です: ${folderName}`)
     }
     
+    console.log(`🔍 Getting ${folderName} folder ID...`)
+    console.log(`📋 Available sub folders:`, SUB_FOLDERS)
+    
     // ローカルストレージからフォルダIDを取得
-    const savedFolderId = localStorage.getItem(getSubFolderStorageKey(folderName))
+    const storageKey = getSubFolderStorageKey(folderName)
+    const savedFolderId = localStorage.getItem(storageKey)
+    
+    console.log(`💾 Storage key: ${storageKey}`)
+    console.log(`💾 Saved folder ID: ${savedFolderId}`)
     
     if (!savedFolderId) {
+      console.log(`❌ ${folderName} folder ID not found in localStorage`)
       throw new Error(`${folderName}フォルダIDが保存されていません。ログインしてください。`)
     }
     
     // フォルダIDの有効性を検証
     try {
+      console.log(`🔍 Verifying ${folderName} folder ID: ${savedFolderId}`)
       const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+      console.log(`📡 Verification URL: ${url}`)
+      
       const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
+      console.log(`📡 Verification response status: ${verifyResponse.status}`)
       
       if (verifyResponse.ok) {
         const folderInfo = await verifyResponse.json()
+        console.log(`📄 Folder info:`, folderInfo)
+        
         if (!folderInfo.trashed && folderInfo.name === folderName) {
           console.log(`✅ Using saved ${folderName} folder ID:`, savedFolderId)
           return { id: savedFolderId }
         } else {
           console.log(`⚠️ Saved ${folderName} folder is trashed or has wrong name`)
+          console.log(`📄 Expected name: ${folderName}, actual name: ${folderInfo.name}`)
+          console.log(`📄 Trashed: ${folderInfo.trashed}`)
           localStorage.removeItem(getSubFolderStorageKey(folderName))
           throw new Error(`保存された${folderName}フォルダが無効です。ログインしてください。`)
         }
       } else {
         console.log(`⚠️ Saved ${folderName} folder ID is invalid`)
+        const errorText = await verifyResponse.text()
+        console.log(`📄 Error response:`, errorText)
         localStorage.removeItem(getSubFolderStorageKey(folderName))
         throw new Error(`保存された${folderName}フォルダが見つかりません。ログインしてください。`)
       }

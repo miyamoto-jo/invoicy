@@ -3,8 +3,19 @@
     <div class="customers-header">
       <h1>顧客管理</h1>
       <div class="header-actions">
-        <button @click="showCreateForm" class="btn btn-primary">
-          ＋ 新規顧客
+        <button
+          @click="showCreateForm"
+          class="btn btn-primary"
+          :disabled="customersStore.isLoading"
+        >
+          新規登録
+        </button>
+        <button
+          @click="showBulkCreateForm"
+          class="btn btn-outline"
+          :disabled="customersStore.isLoading"
+        >
+          一括登録
         </button>
       </div>
     </div>
@@ -285,7 +296,7 @@ const formatDate = (dateString) => {
 
 .header-actions {
   display: flex;
-  gap: 10px;
+  gap: 1rem;
 }
 
 .content-wrapper {
@@ -390,6 +401,54 @@ const formatDate = (dateString) => {
   }
 }
 
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: #007bff;
+  border: 1px solid #007bff;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #545b62;
+}
+
 @media (min-width: 1024px) {
   .content-wrapper {
     grid-template-columns: 1fr 400px;
@@ -397,13 +456,13 @@ const formatDate = (dateString) => {
 }
 
 @media (max-width: 768px) {
-  .header-content {
+  .customers-header {
     flex-direction: column;
     gap: 1rem;
+    align-items: stretch;
   }
   
   .header-actions {
-    width: 100%;
     justify-content: center;
   }
   

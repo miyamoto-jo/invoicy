@@ -2,7 +2,6 @@
   <div class="product-bulk-create">
     <div class="manual-input-section">
       <div class="input-header">
-        <h3>商品一括登録</h3>
         <div class="input-actions">
           <button
             @click="addProductRow"

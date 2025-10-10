@@ -10,22 +10,6 @@
           placeholder="商品名で検索..."
         />
       </div>
-      <div class="actions">
-        <button
-          @click="$emit('bulk-create')"
-          class="btn btn-outline"
-          :disabled="isLoading"
-        >
-          一括登録
-        </button>
-        <button
-          @click="$emit('add')"
-          class="btn btn-primary"
-          :disabled="isLoading"
-        >
-          新規登録
-        </button>
-      </div>
     </div>
 
     <!-- エラーメッセージ -->
@@ -89,12 +73,6 @@
       <div class="empty-icon">📦</div>
       <h3>商品が登録されていません</h3>
       <p>新規登録ボタンから商品を追加してください。</p>
-      <button
-        @click="$emit('add')"
-        class="btn btn-primary"
-      >
-        商品を登録
-      </button>
     </div>
 
     <!-- 削除確認モーダル -->
@@ -218,7 +196,7 @@ const deleteProduct = async () => {
 
 .list-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   margin-bottom: 2rem;
   gap: 1rem;

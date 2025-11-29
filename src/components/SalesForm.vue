@@ -397,7 +397,7 @@ const addProductToCart = (product) => {
       alias: product.alias,
       quantity: 1,
       priceExclTax: product.priceExclTax,
-      taxRate: formData.value.invoiceTaxRate || defaultTaxRate.value || 10
+      taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
     })
   }
 }
@@ -424,7 +424,7 @@ const getProductQuantity = (productId) => {
 const recalculateTotals = () => {
   // 選択された商品の税率を更新
   selectedProducts.value.forEach(item => {
-    item.taxRate = formData.value.invoiceTaxRate || defaultTaxRate.value || 10
+    item.taxRate = formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
   })
 }
 
@@ -468,7 +468,7 @@ const handleSubmit = async () => {
         alias: item.alias,
         quantity: item.quantity,
         priceExclTax: item.priceExclTax,
-        taxRate: formData.value.invoiceTaxRate || defaultTaxRate.value || 10
+        taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
       })),
       note: formData.value.note
     }

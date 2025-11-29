@@ -116,6 +116,15 @@ export class GoogleApiClient {
   }
 
   /**
+   * ファイル内容をテキストとして取得（JSONLファイル用）
+   */
+  async getFileContentAsText(token, fileId) {
+    const url = this.getDriveFileUrl(fileId, { alt: 'media' })
+    const response = await this.makeAuthenticatedRequest(url, token)
+    return response.text()
+  }
+
+  /**
    * ファイル内容を更新
    */
   async updateFileContent(token, fileId, content) {
@@ -126,6 +135,20 @@ export class GoogleApiClient {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(content)
+    })
+  }
+
+  /**
+   * ファイル内容をテキストとして更新（JSONLファイル用）
+   */
+  async updateFileContentAsText(token, fileId, content) {
+    const url = this.getDriveFileUploadUrl(fileId, 'media')
+    return this.makeAuthenticatedRequest(url, token, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: content
     })
   }
 

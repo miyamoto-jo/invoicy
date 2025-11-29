@@ -40,7 +40,7 @@ export const APP_CONFIG = {
   FOLDER_NAME: import.meta.env.VITE_APP_FOLDER_NAME || 'Invoicy',
   
   // サブフォルダ
-  SUB_FOLDERS: ['masters', 'sales'],
+  SUB_FOLDERS: ['masters', 'sales', 'invoices'],
   
   // ファイル名
   FILES: {

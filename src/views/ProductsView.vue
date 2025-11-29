@@ -2,6 +2,22 @@
   <AppLayout>
     <div class="products-header">
       <h1>商品管理</h1>
+      <div class="header-actions">
+        <button
+          @click="showAddForm"
+          class="btn btn-primary"
+          :disabled="isLoading"
+        >
+          新規登録
+        </button>
+        <button
+          @click="showBulkCreateForm"
+          class="btn btn-outline"
+          :disabled="isLoading"
+        >
+          一括登録
+        </button>
+      </div>
     </div>
     
     <div class="products-content">
@@ -191,6 +207,11 @@ const handleDelete = async (productId) => {
   margin-bottom: 2rem;
 }
 
+.header-actions {
+  display: flex;
+  gap: 1rem;
+}
+
 .products-header h1 {
   color: #333;
   font-size: 1.5rem;
@@ -275,10 +296,14 @@ const handleDelete = async (productId) => {
 
 /* レスポンシブ */
 @media (max-width: 768px) {
-  .header-content {
+  .products-header {
     flex-direction: column;
     gap: 1rem;
     align-items: stretch;
+  }
+  
+  .header-actions {
+    justify-content: center;
   }
   
   .card-header {

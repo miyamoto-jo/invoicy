@@ -11,6 +11,9 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoading = ref(false)
   const error = ref(null)
   
+  // フォルダ作成処理の排他制御用フラグ
+  const isCreatingAppFolder = ref(false)
+  
   // Google Identity Services client
   let tokenClient = null
   
@@ -408,6 +411,23 @@ export const useAuthStore = defineStore('auth', () => {
   
   // アプリフォルダの確認・作成
   const ensureAppFolder = async (token) => {
+    // 既にフォルダ作成処理中の場合は待機
+    if (isCreatingAppFolder.value) {
+      console.log('⏳ App folder creation already in progress, waiting...')
+      // 作成処理が完了するまで待機
+      while (isCreatingAppFolder.value) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+      // 作成完了後、ローカルストレージからフォルダIDを取得
+      const savedFolderId = localStorage.getItem(STORAGE_KEYS.APP_FOLDER_ID)
+      if (savedFolderId) {
+        return { id: savedFolderId }
+      }
+    }
+    
+    // フォルダ作成処理を開始
+    isCreatingAppFolder.value = true
+    
     try {
       console.log('🔍 Checking app folder...')
       console.log('📋 App folder name:', APP_FOLDER_NAME)
@@ -420,6 +440,10 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('📄 Search result:', searchResult)
       
       if (searchResult.files && searchResult.files.length > 0) {
+        // 複数のフォルダが見つかった場合は最初のものを使用
+        if (searchResult.files.length > 1) {
+          console.log(`⚠️ Found ${searchResult.files.length} app folders, using the first one`)
+        }
         const existingFolder = searchResult.files[0]
         console.log('✅ Found existing app folder:', existingFolder.id)
         
@@ -430,6 +454,8 @@ export const useAuthStore = defineStore('auth', () => {
         // サブフォルダの確認・作成
         await ensureSubFolders(token, existingFolder.id)
         
+        // フォルダ作成処理完了
+        isCreatingAppFolder.value = false
         return existingFolder
       }
       
@@ -451,6 +477,8 @@ export const useAuthStore = defineStore('auth', () => {
             // サブフォルダの確認・作成
             await ensureSubFolders(token, savedFolderId)
             
+            // フォルダ作成処理完了
+            isCreatingAppFolder.value = false
             return { id: savedFolderId }
           } else {
             console.log('⚠️ Saved folder is trashed or has wrong name, removing from localStorage')
@@ -484,6 +512,9 @@ export const useAuthStore = defineStore('auth', () => {
         name: err.name
       })
       throw err
+    } finally {
+      // フォルダ作成処理完了
+      isCreatingAppFolder.value = false
     }
   }
   
@@ -630,30 +661,48 @@ export const useAuthStore = defineStore('auth', () => {
       throw new Error(`無効なフォルダ名です: ${folderName}`)
     }
     
+    console.log(`🔍 Getting ${folderName} folder ID...`)
+    console.log(`📋 Available sub folders:`, SUB_FOLDERS)
+    
     // ローカルストレージからフォルダIDを取得
-    const savedFolderId = localStorage.getItem(getSubFolderStorageKey(folderName))
+    const storageKey = getSubFolderStorageKey(folderName)
+    const savedFolderId = localStorage.getItem(storageKey)
+    
+    console.log(`💾 Storage key: ${storageKey}`)
+    console.log(`💾 Saved folder ID: ${savedFolderId}`)
     
     if (!savedFolderId) {
+      console.log(`❌ ${folderName} folder ID not found in localStorage`)
       throw new Error(`${folderName}フォルダIDが保存されていません。ログインしてください。`)
     }
     
     // フォルダIDの有効性を検証
     try {
+      console.log(`🔍 Verifying ${folderName} folder ID: ${savedFolderId}`)
       const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+      console.log(`📡 Verification URL: ${url}`)
+      
       const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
+      console.log(`📡 Verification response status: ${verifyResponse.status}`)
       
       if (verifyResponse.ok) {
         const folderInfo = await verifyResponse.json()
+        console.log(`📄 Folder info:`, folderInfo)
+        
         if (!folderInfo.trashed && folderInfo.name === folderName) {
           console.log(`✅ Using saved ${folderName} folder ID:`, savedFolderId)
           return { id: savedFolderId }
         } else {
           console.log(`⚠️ Saved ${folderName} folder is trashed or has wrong name`)
+          console.log(`📄 Expected name: ${folderName}, actual name: ${folderInfo.name}`)
+          console.log(`📄 Trashed: ${folderInfo.trashed}`)
           localStorage.removeItem(getSubFolderStorageKey(folderName))
           throw new Error(`保存された${folderName}フォルダが無効です。ログインしてください。`)
         }
       } else {
         console.log(`⚠️ Saved ${folderName} folder ID is invalid`)
+        const errorText = await verifyResponse.text()
+        console.log(`📄 Error response:`, errorText)
         localStorage.removeItem(getSubFolderStorageKey(folderName))
         throw new Error(`保存された${folderName}フォルダが見つかりません。ログインしてください。`)
       }

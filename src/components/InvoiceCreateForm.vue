@@ -408,14 +408,29 @@ const calculateInvoiceData = async (customerId) => {
         productName: line.productName,
         quantity: line.quantity,
         unitPriceExclTax: line.priceExclTax,
+        taxRate: line.taxRate, // taxRateを追加
         subtotalExclTax: line.quantity * line.priceExclTax
       })
     })
   })
 
-  // 集計計算
-  const subtotalExclTax = details.reduce((sum, detail) => sum + detail.subtotalExclTax, 0)
-  const totalTax = Math.floor(subtotalExclTax * 0.1) // 10%税率を仮定
+  // 集計計算（税率ごとに計算）
+  let subtotalExclTax = 0
+  const taxByRate = {}
+
+  details.forEach(detail => {
+    subtotalExclTax += detail.subtotalExclTax
+    
+    // 税額計算（切り捨て）
+    const taxAmount = Math.floor(detail.subtotalExclTax * (detail.taxRate / 100))
+    if (taxByRate[detail.taxRate]) {
+      taxByRate[detail.taxRate] += taxAmount
+    } else {
+      taxByRate[detail.taxRate] = taxAmount
+    }
+  })
+
+  const totalTax = Object.values(taxByRate).reduce((sum, tax) => sum + tax, 0)
   const totalInclTax = subtotalExclTax + totalTax
 
   return {
@@ -426,11 +441,24 @@ const calculateInvoiceData = async (customerId) => {
     paymentMethod: customer.paymentMethod,
     summary: {
       subtotalExclTax,
+      taxByRate, // taxByRateを追加
       totalTax,
       totalInclTax
     },
     details
   }
+}
+
+// 指定された日がその月に存在するかチェックし、存在しない場合はその月の最終日を返す
+const getValidClosingDay = (year, month, day) => {
+  const date = new Date(year, month - 1, day)
+  // 日付が自動調整された場合（存在しない日付の場合）、元の月と異なる場合は最終日を使用
+  if (date.getMonth() !== month - 1) {
+    // その月の最終日を取得
+    const lastDay = new Date(year, month, 0).getDate()
+    return lastDay
+  }
+  return day
 }
 
 const calculateClosingPeriod = (closingDay, targetMonth) => {
@@ -442,24 +470,29 @@ const calculateClosingPeriod = (closingDay, targetMonth) => {
       to: getLastDayOfMonth(targetMonth)
     }
   } else {
-    // 数字の締日（例：20日締め、25日締め）の場合
+    // 数字の締日（例：20日締め、25日締め、31日締め）の場合
     // 前月の締日の翌日〜当月の締日
     // 例：1月分で20日締め → 12/21 ~ 1/20
+    // 例：11月分で31日締め → 10/21 ~ 11/30（31日が存在しないため30日で代用）
     const day = parseInt(closingDay)
     const [year, month] = targetMonth.split('-')
+    const yearNum = parseInt(year)
+    const monthNum = parseInt(month)
     
-    // 当月の締日
-    const toDate = `${targetMonth}-${String(day).padStart(2, '0')}`
+    // 当月の締日（31日が存在しない月はその月の最終日で代用）
+    const validDay = getValidClosingDay(yearNum, monthNum, day)
+    const toDate = `${targetMonth}-${String(validDay).padStart(2, '0')}`
     
     // 前月の締日を計算
-    const targetDate = new Date(year, month - 1, day) // 当月の締日
+    const targetDate = new Date(yearNum, monthNum - 1, validDay) // 当月の締日
     const prevMonthDate = new Date(targetDate)
     prevMonthDate.setMonth(prevMonthDate.getMonth() - 1) // 前月に移動
     const prevYear = prevMonthDate.getFullYear()
-    const prevMonth = String(prevMonthDate.getMonth() + 1).padStart(2, '0')
+    const prevMonth = prevMonthDate.getMonth() + 1
     
-    // 前月の締日の翌日を計算
-    const prevClosingDate = new Date(prevYear, prevMonthDate.getMonth(), day)
+    // 前月の締日も存在しない日付の場合は最終日で代用
+    const prevValidDay = getValidClosingDay(prevYear, prevMonth, day)
+    const prevClosingDate = new Date(prevYear, prevMonth - 1, prevValidDay)
     const nextDay = new Date(prevClosingDate)
     nextDay.setDate(nextDay.getDate() + 1) // 翌日
     

@@ -161,9 +161,10 @@ const generateCustomerPdf = async (customer) => {
         const unitPrice = detail.unitPriceExclTax || (detail.subtotalExclTax / quantity) || 0
         // subtotalExclTaxが存在する場合はそれを使用、なければ計算
         const amount = detail.subtotalExclTax || (quantity * unitPrice)
-        // taxRateが存在しない場合はデフォルト10%
-        const taxRate = detail.taxRate || 0.1
-        const tax = Math.round(amount * taxRate)
+        // taxRateが存在しない場合はデフォルト10%、0の場合は0%として扱う
+        const taxRate = detail.taxRate !== undefined && detail.taxRate !== null ? detail.taxRate : 10
+        // 税額計算を修正（taxRateはパーセンテージなので100で割る）
+        const tax = Math.floor(amount * taxRate / 100)
         const total = amount + tax
         
         allDetails.push({
@@ -404,7 +405,7 @@ const createDetailPageHtml = (customer, year, month, pageDetails, pageIndex, isL
           <td style="border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: ${PDF_CONFIG.tableRowPadding}; text-align: ${PDF_CONFIG.textAlignCenter};">${detail.quantity}</td>
           <td style="border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: ${PDF_CONFIG.tableRowPadding}; text-align: right;">¥${(detail.unitPrice || detail.unitPriceExclTax || 0).toLocaleString()}</td>
           <td style="border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: ${PDF_CONFIG.tableRowPadding}; text-align: right;">¥${(detail.amount || detail.subtotalExclTax || 0).toLocaleString()}</td>
-          <td style="border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: ${PDF_CONFIG.tableRowPadding}; text-align: ${PDF_CONFIG.textAlignCenter};">${Math.round(detail.taxRate * 100)}%</td>
+          <td style="border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: ${PDF_CONFIG.tableRowPadding}; text-align: ${PDF_CONFIG.textAlignCenter};">${detail.taxRate}%</td>
         </tr>
       `
     } else {
@@ -438,7 +439,7 @@ const createDetailPageHtml = (customer, year, month, pageDetails, pageIndex, isL
     Object.entries(taxRateGroups).forEach(([rate, data]) => {
       html += `
         <tr>
-          <td style="border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: ${PDF_CONFIG.tablePadding}; font-weight: ${PDF_CONFIG.fontWeightBold}; width: 70%;">${Math.round(parseFloat(rate) * 100)}%対象 小計</td>
+          <td style="border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: ${PDF_CONFIG.tablePadding}; font-weight: ${PDF_CONFIG.fontWeightBold}; width: 70%;">${rate}%対象 小計</td>
           <td style="border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: ${PDF_CONFIG.tablePadding}; text-align: right; font-weight: ${PDF_CONFIG.fontWeightBold};">¥${data.amount.toLocaleString()}</td>
           <td style="border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: ${PDF_CONFIG.tablePadding}; text-align: right; font-weight: ${PDF_CONFIG.fontWeightBold};">¥${data.tax.toLocaleString()}</td>
         </tr>

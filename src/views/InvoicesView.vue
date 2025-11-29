@@ -235,6 +235,7 @@ const showDatePicker = ref(false)
 const displayYear = ref(new Date().getFullYear())
 const showDeleteConfirm = ref(false)
 const invoiceToDelete = ref(null)
+const error = ref(null)
 
 // デフォルト値を現在の月に設定
 const getCurrentMonth = () => {
@@ -268,6 +269,10 @@ const filteredInvoices = computed(() => {
     console.log('🔍 Filtering by period:', searchFilters.value.period)
     result = result.filter(invoice => {
       // 請求書の期間をYYYY-MM形式に変換して比較
+      if (!invoice.period) {
+        console.warn('⚠️ Invoice missing period property:', invoice)
+        return false // periodが存在しない場合はフィルタから除外
+      }
       const invoiceYearMonth = invoice.period.replace('年', '-').replace('月分', '')
       const matches = invoiceYearMonth === searchFilters.value.period
       console.log(`📄 Invoice period: "${invoice.period}" -> "${invoiceYearMonth}", filter: "${searchFilters.value.period}", matches: ${matches}`)

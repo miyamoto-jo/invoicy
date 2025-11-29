@@ -60,8 +60,8 @@ export const useSalesStore = defineStore('sales', () => {
         const salesData = []
         for (const file of data.files) {
           try {
-            const content = await googleApiClient.getFileContent(token, file.id)
-            if (content) {
+            const content = await googleApiClient.getFileContentAsText(token, file.id)
+            if (content && content.trim()) {
               // JSONL形式の内容をパース
               const lines = content.split('\n').filter(line => line.trim())
               for (const line of lines) {
@@ -291,8 +291,8 @@ export const useSalesStore = defineStore('sales', () => {
         const salesData = []
         for (const file of data.files) {
           try {
-            const content = await googleApiClient.getFileContent(token, file.id)
-            if (content) {
+            const content = await googleApiClient.getFileContentAsText(token, file.id)
+            if (content && content.trim()) {
               // JSONL形式の内容をパース
               const lines = content.split('\n').filter(line => line.trim())
               for (const line of lines) {
@@ -461,11 +461,20 @@ export const useSalesStore = defineStore('sales', () => {
       let existingSales = []
       
       if (data.files && data.files.length > 0) {
-        // 既存ファイルが存在する場合、内容を取得
+        // 既存ファイルが存在する場合、内容を取得（JSONL形式のテキストとして取得）
         const file = data.files[0]
-        const content = await googleApiClient.getFileContent(token, file.id)
-        if (content && Array.isArray(content)) {
-          existingSales = content
+        const content = await googleApiClient.getFileContentAsText(token, file.id)
+        if (content && content.trim()) {
+          // JSONL形式の内容をパース
+          const lines = content.split('\n').filter(line => line.trim())
+          for (const line of lines) {
+            try {
+              const sale = JSON.parse(line)
+              existingSales.push(sale)
+            } catch (parseErr) {
+              console.warn('Failed to parse sale line:', line, parseErr)
+            }
+          }
         }
       }
       
@@ -476,9 +485,9 @@ export const useSalesStore = defineStore('sales', () => {
       const jsonlContent = updatedSales.map(sale => JSON.stringify(sale)).join('\n')
       
       if (data.files && data.files.length > 0) {
-        // 既存ファイルを更新
+        // 既存ファイルを更新（テキストとして更新）
         const file = data.files[0]
-        await googleApiClient.updateFileContent(token, file.id, jsonlContent)
+        await googleApiClient.updateFileContentAsText(token, file.id, jsonlContent)
       } else {
         // 新しいファイルを作成
         const fileData = {
@@ -487,7 +496,7 @@ export const useSalesStore = defineStore('sales', () => {
         }
         const createResponse = await googleApiClient.createFile(token, fileData)
         const file = await createResponse.json()
-        await googleApiClient.updateFileContent(token, file.id, jsonlContent)
+        await googleApiClient.updateFileContentAsText(token, file.id, jsonlContent)
       }
       
     } catch (err) {

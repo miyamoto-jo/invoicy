@@ -9,6 +9,7 @@ import CustomersView from '../views/CustomersView.vue'
 import ProductsView from '../views/ProductsView.vue'
 import TaxesView from '../views/TaxesView.vue'
 import SalesView from '../views/SalesView.vue'
+import SalesListView from '../views/SalesListView.vue'
 import InvoicesView from '../views/InvoicesView.vue'
 
 const routes = [
@@ -52,6 +53,12 @@ const routes = [
     path: '/sales',
     name: 'sales',
     component: SalesView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/sales/list',
+    name: 'sales-list',
+    component: SalesListView,
     meta: { requiresAuth: true }
   },
   {

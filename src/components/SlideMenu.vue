@@ -55,6 +55,10 @@
             <div class="menu-icon invoice-icon">📄</div>
             <span class="menu-text">請求書作成</span>
           </router-link>
+          <router-link to="/sales/list" class="menu-item">
+            <div class="menu-icon sales-list-icon">📋</div>
+            <span class="menu-text">売上一覧</span>
+          </router-link>
         </div>
         
         <!-- マスター管理セクション -->
@@ -351,6 +355,10 @@ onUnmounted(() => {
 
 .sales-icon {
   color: #f57c00;
+}
+
+.sales-list-icon {
+  color: #2196f3;
 }
 
 .invoice-icon {

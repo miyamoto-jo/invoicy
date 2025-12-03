@@ -93,6 +93,72 @@ export const useSalesStore = defineStore('sales', () => {
     }
   }
   
+  const loadSalesByYearMonth = async (yearMonth) => {
+    try {
+      isLoading.value = true
+      error.value = null
+      
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+      
+      // アプリフォルダの取得
+      const appFolder = await authStore.getAppFolderId()
+      
+      // salesフォルダの取得または作成
+      const salesFolder = await getOrCreateSalesFolder(token, appFolder.id)
+      
+      // 年月をYYYYMM形式に変換（例: "2025-12" -> "202512"）
+      const yearMonthStr = yearMonth.replace('-', '')
+      const fileName = `ledger-${yearMonthStr}.jsonl`
+      
+      // 特定の月次ファイルを検索
+      const query = `name='${fileName}' and '${salesFolder.id}' in parents and trashed=false`
+      const data = await googleApiClient.searchFiles(token, query, 'files(id,name)', 'name desc')
+      
+      if (data.files && data.files.length > 0) {
+        // 月次ファイルの内容を取得
+        const salesData = []
+        const file = data.files[0]
+        try {
+          const content = await googleApiClient.getFileContentAsText(token, file.id)
+          if (content && content.trim()) {
+            // JSONL形式の内容をパース
+            const lines = content.split('\n').filter(line => line.trim())
+            for (const line of lines) {
+              try {
+                const saleData = JSON.parse(line)
+                // Saleインスタンスに変換
+                const sale = Sale.fromData(saleData)
+                salesData.push(sale)
+              } catch (parseErr) {
+                console.warn('Failed to parse sale line:', line, parseErr)
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to load monthly ledger file:', file.name, err)
+        }
+        
+        // issuedOnが新しい順でソート
+        salesData.sort((a, b) => new Date(b.issuedOn) - new Date(a.issuedOn))
+        
+        return salesData
+      } else {
+        return []
+      }
+      
+    } catch (err) {
+      console.error('Failed to load sales by year month:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+  
   const createSale = async (saleData) => {
     try {
       isLoading.value = true
@@ -489,6 +555,88 @@ export const useSalesStore = defineStore('sales', () => {
       throw err
     }
   }
+
+  const voidSale = async (saleToVoid, issuedOn) => {
+    try {
+      isLoading.value = true
+      error.value = null
+      
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+      
+      // 伝票IDの生成
+      const ticketId = `tkt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
+      // 現在の日時を取得（JST）
+      const now = new Date()
+      const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
+      const createdAt = jstNow.toISOString().replace('Z', '+09:00')
+      
+      // linesは同じものをコピー
+      const voidLines = saleToVoid.lines.map(line => line.toJSON())
+      
+      // totalsの符号を逆転（+だったら-に、-だったら+に）
+      const originalTotals = saleToVoid.totals
+      const voidTotals = {
+        subtotalExclTax: -originalTotals.subtotalExclTax,
+        taxByRate: {},
+        totalTax: -originalTotals.totalTax,
+        totalInclTax: -originalTotals.totalInclTax
+      }
+      
+      // taxByRateの各税率の税額も符号を逆転
+      for (const [rate, taxAmount] of Object.entries(originalTotals.taxByRate)) {
+        voidTotals.taxByRate[rate] = -taxAmount
+      }
+      
+      // 売上データの作成
+      const voidSaleData = {
+        id: ticketId,
+        customerId: saleToVoid.customerId,
+        issuedOn: issuedOn, // モーダル表示時に取得したシステム日
+        lines: voidLines,
+        note: '',
+        totals: voidTotals,
+        isNegative: !saleToVoid.isNegative, // 取り消す伝票と逆にする
+        negatesTicketId: saleToVoid.id, // 取り消す伝票のid
+        createdAt: createdAt
+      }
+      
+      // Saleインスタンスを作成
+      const newVoidSale = Sale.fromData(voidSaleData)
+      
+      // バリデーション
+      newVoidSale.validate()
+      
+      // アプリフォルダの取得
+      const appFolder = await authStore.getAppFolderId()
+      
+      // salesフォルダの取得または作成
+      const salesFolder = await getOrCreateSalesFolder(token, appFolder.id)
+      
+      // 月次ファイル名の生成（YYYYMM）
+      const yearMonth = issuedOn.substring(0, 7).replace('-', '')
+      const fileName = `ledger-${yearMonth}.jsonl`
+      
+      // 月次ファイルに追加
+      await updateMonthlyLedger(token, salesFolder.id, fileName, [newVoidSale.toJSON()])
+      
+      // ローカルの状態を更新
+      sales.value.unshift(newVoidSale)
+      
+      return newVoidSale
+      
+    } catch (err) {
+      console.error('Failed to void sale:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
   
   
   return {
@@ -505,9 +653,11 @@ export const useSalesStore = defineStore('sales', () => {
     // Actions
     initializeSales,
     loadSales,
+    loadSalesByYearMonth,
     bulkReflectSales,
     searchSales,
     getSaleById,
-    deleteSale
+    deleteSale,
+    voidSale
   }
 }) 

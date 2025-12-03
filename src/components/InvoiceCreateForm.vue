@@ -402,14 +402,19 @@ const calculateInvoiceData = async (customerId) => {
   // 明細データの生成（SaleLineのメソッドを使用）
   const details = []
   targetSales.forEach(sale => {
+    // 取消伝票の場合は符号を反転させる
+    const sign = sale.isNegative ? -1 : 1
+    
     sale.lines.forEach(line => {
+      const subtotalExclTax = line.calculateSubtotalExclTax() * sign
+      
       details.push({
         orderDate: sale.issuedOn,
         productName: line.productName,
-        quantity: line.quantity,
+        quantity: line.quantity * sign, // 取消伝票の場合は負数
         unitPriceExclTax: line.priceExclTax,
         taxRate: line.taxRate,
-        subtotalExclTax: line.calculateSubtotalExclTax() // モデルのメソッドを使用
+        subtotalExclTax: subtotalExclTax // 取消伝票の場合は負数
       })
     })
   })

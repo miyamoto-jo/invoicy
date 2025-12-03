@@ -130,11 +130,11 @@
             <div class="invoice-summary">
               <div class="amount">
                 <span class="label">合計金額</span>
-                <span class="value">¥{{ formatNumber(invoice.summary.totalInclTax) }}</span>
+                <span class="value">¥{{ invoice.summary.formatTotalInclTax() }}</span>
               </div>
               <div class="details">
-                <span>税抜: ¥{{ formatNumber(invoice.summary.subtotalExclTax) }}</span>
-                <span>税額: ¥{{ formatNumber(invoice.summary.totalTax) }}</span>
+                <span>税抜: ¥{{ invoice.summary.formatSubtotal() }}</span>
+                <span>税額: ¥{{ invoice.summary.formatTotalTax() }}</span>
               </div>
             </div>
             <div class="invoice-actions">

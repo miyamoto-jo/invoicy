@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
 import { APP_CONFIG } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
+import { Product } from '../models/Product.js'
 
 export const useProductsStore = defineStore('products', () => {
   // State
@@ -61,7 +62,10 @@ export const useProductsStore = defineStore('products', () => {
         for (const line of lines) {
           if (line.trim()) {
             try {
-              parsedProducts.push(JSON.parse(line))
+              const productData = JSON.parse(line)
+              // Productインスタンスに変換
+              const product = Product.fromData(productData)
+              parsedProducts.push(product)
             } catch (err) {
               console.warn('Invalid JSON line in products.jsonl:', line, err)
             }
@@ -90,20 +94,11 @@ export const useProductsStore = defineStore('products', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      if (!productData.name || productData.name.trim() === '') {
-        throw new Error('商品名は必須です')
-      }
-      
-      if (!productData.price || isNaN(productData.price) || productData.price < 0) {
-        throw new Error('税抜金額は0以上の数値を入力してください')
-      }
-      
       // 商品IDの生成
       const productId = `prd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       
       // 商品データの作成
-      const newProduct = {
+      const productDataWithId = {
         id: productId,
         name: productData.name.trim(),
         alias: productData.alias?.trim() || '',
@@ -112,6 +107,13 @@ export const useProductsStore = defineStore('products', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
+      
+      // Productインスタンスを作成
+      const newProduct = new Product(productDataWithId)
+      
+      // バリデーション
+      newProduct.validateName()
+      newProduct.validatePrice()
       
       // ローカル状態を更新
       products.value.push(newProduct)
@@ -170,7 +172,7 @@ export const useProductsStore = defineStore('products', () => {
           const productId = `prd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
           
           // 商品データの作成
-          const newProduct = {
+          const productDataWithId = {
             id: productId,
             name: productData.name.trim(),
             alias: productData.alias?.trim() || '',
@@ -179,6 +181,13 @@ export const useProductsStore = defineStore('products', () => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           }
+          
+          // Productインスタンスを作成
+          const newProduct = new Product(productDataWithId)
+          
+          // バリデーション
+          newProduct.validateName()
+          newProduct.validatePrice()
           
           // ローカル状態を更新
           products.value.push(newProduct)
@@ -216,30 +225,28 @@ export const useProductsStore = defineStore('products', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      if (!productData.name || productData.name.trim() === '') {
-        throw new Error('商品名は必須です')
-      }
-      
-      if (!productData.price || isNaN(productData.price) || productData.price < 0) {
-        throw new Error('税抜金額は0以上の数値を入力してください')
-      }
-      
       // 既存の商品を検索
       const existingProduct = products.value.find(p => p.id === productId)
       if (!existingProduct) {
         throw new Error('商品が見つかりません')
       }
       
-      // 商品データの更新
-      const updatedProduct = {
-        ...existingProduct,
+      // 既存の商品データを取得して更新
+      const updatedProductData = {
+        ...existingProduct.toJSON(),
         name: productData.name.trim(),
         alias: productData.alias?.trim() || '',
         priceExclTax: Number(productData.price),
         usedByCustomerIds: productData.customerId ? [productData.customerId] : [],
         updatedAt: new Date().toISOString()
       }
+      
+      // Productインスタンスを作成
+      const updatedProduct = new Product(updatedProductData)
+      
+      // バリデーション
+      updatedProduct.validateName()
+      updatedProduct.validatePrice()
       
       // ローカル状態を更新
       const index = products.value.findIndex(p => p.id === productId)
@@ -356,8 +363,8 @@ export const useProductsStore = defineStore('products', () => {
       const appFolder = await authStore.getAppFolderId()
       const productsFile = await getOrCreateProductsFile(token, appFolder.id)
       
-      // ファイルの内容を更新（JSONL形式）
-      const jsonlContent = products.value.map(product => JSON.stringify(product)).join('\n')
+      // ファイルの内容を更新（JSONL形式、ProductインスタンスをJSONに変換）
+      const jsonlContent = products.value.map(product => JSON.stringify(product.toJSON())).join('\n')
       await googleApiClient.updateFileContent(token, productsFile.id, jsonlContent)
       
     } catch (err) {

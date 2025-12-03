@@ -65,7 +65,7 @@
               <div class="detail-content">
                 <div class="detail-item">
                   <span class="label">顧客名:</span>
-                  <span class="value">{{ selectedCustomer.name }}</span>
+                  <span class="value">{{ selectedCustomer.getDisplayName() }}</span>
                 </div>
                 
                 <div v-if="selectedCustomer.alias" class="detail-item">
@@ -191,9 +191,9 @@ const editSelectedCustomer = () => {
 
 const deleteCustomer = async (customer) => {
   try {
-    setLoading(true, '削除中...', `「${customer.name}」を削除しています`)
+    setLoading(true, '削除中...', `「${customer.getDisplayName()}」を削除しています`)
     await customersStore.deleteCustomer(customer.id)
-    showSuccessMessage(`「${customer.name}」を削除しました`)
+    showSuccessMessage(`「${customer.getDisplayName()}」を削除しました`)
     
     // 削除された顧客が選択されている場合は詳細を閉じる
     if (selectedCustomer.value && selectedCustomer.value.id === customer.id) {

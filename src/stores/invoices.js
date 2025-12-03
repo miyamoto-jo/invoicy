@@ -3,6 +3,9 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
 import { APP_CONFIG } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
+import { Invoice } from '../models/Invoice.js'
+import { InvoiceDetail } from '../models/InvoiceDetail.js'
+import { InvoiceSummary } from '../models/InvoiceSummary.js'
 
 export const useInvoicesStore = defineStore('invoices', () => {
   // State
@@ -81,7 +84,9 @@ export const useInvoicesStore = defineStore('invoices', () => {
               const lines = content.split('\n').filter(line => line.trim())
               for (const line of lines) {
                 try {
-                  const invoice = JSON.parse(line)
+                  const invoiceData = JSON.parse(line)
+                  // Invoiceインスタンスに変換
+                  const invoice = Invoice.fromData(invoiceData)
                   invoicesData.push(invoice)
                 } catch (parseErr) {
                   console.warn('Failed to parse invoice line:', line, parseErr)
@@ -124,15 +129,6 @@ export const useInvoicesStore = defineStore('invoices', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      if (!invoiceData.customerId) {
-        throw new Error('顧客を選択してください')
-      }
-      
-      if (!invoiceData.period) {
-        throw new Error('対象期間を指定してください')
-      }
-      
       // 請求書IDの生成（顧客IDと期間から固定IDを生成）
       const invoiceId = generateInvoiceId(invoiceData.customerId, invoiceData.period)
       
@@ -141,18 +137,30 @@ export const useInvoicesStore = defineStore('invoices', () => {
       const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
       const createdAt = jstNow.toISOString().replace('Z', '+09:00')
       
+      // detailsをInvoiceDetailインスタンスの配列に変換
+      const invoiceDetails = invoiceData.details.map(detailData => InvoiceDetail.fromData(detailData))
+      
+      // summaryを計算（detailsから）
+      const invoiceSummary = InvoiceSummary.calculateFromDetails(invoiceDetails)
+      
       // 請求書データの作成
-      const newInvoice = {
+      const invoiceDataWithId = {
         id: invoiceId,
         customerId: invoiceData.customerId,
         customerName: invoiceData.customerName,
         period: invoiceData.period,
         closingDay: invoiceData.closingDay,
         paymentMethod: invoiceData.paymentMethod,
-        summary: invoiceData.summary,
-        details: invoiceData.details,
+        summary: invoiceSummary.toJSON(), // InvoiceSummaryをJSONに変換
+        details: invoiceDetails.map(detail => detail.toJSON()), // InvoiceDetailをJSONに変換
         createdAt: createdAt
       }
+      
+      // Invoiceインスタンスを作成
+      const newInvoice = Invoice.fromData(invoiceDataWithId)
+      
+      // バリデーション
+      newInvoice.validate()
       
       // invoicesフォルダIDの取得
       const invoicesFolderId = await getInvoicesFolderId(token)
@@ -161,8 +169,8 @@ export const useInvoicesStore = defineStore('invoices', () => {
       const yearMonth = invoiceData.period.replace('年', '-').replace('月分', '')
       const fileName = `${yearMonth}-invoices.jsonl`
       
-      // 月次ファイルを更新
-      await updateMonthlyInvoices(token, invoicesFolderId, fileName, newInvoice)
+      // 月次ファイルを更新（InvoiceインスタンスをJSONに変換）
+      await updateMonthlyInvoices(token, invoicesFolderId, fileName, newInvoice.toJSON())
       
       // ローカルの状態を更新
       const existingIndex = invoices.value.findIndex(inv => inv.id === newInvoice.id)
@@ -217,15 +225,6 @@ export const useInvoicesStore = defineStore('invoices', () => {
       const invoicesByMonth = {}
       
       for (const invoiceData of invoicesDataArray) {
-        // バリデーション
-        if (!invoiceData.customerId) {
-          throw new Error('顧客を選択してください')
-        }
-        
-        if (!invoiceData.period) {
-          throw new Error('対象期間を指定してください')
-        }
-        
         // 請求書IDの生成（顧客IDと期間から固定IDを生成）
         const invoiceId = generateInvoiceId(invoiceData.customerId, invoiceData.period)
         
@@ -234,18 +233,30 @@ export const useInvoicesStore = defineStore('invoices', () => {
         const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
         const createdAt = jstNow.toISOString().replace('Z', '+09:00')
         
+        // detailsをInvoiceDetailインスタンスの配列に変換
+        const invoiceDetails = invoiceData.details.map(detailData => InvoiceDetail.fromData(detailData))
+        
+        // summaryを計算（detailsから）
+        const invoiceSummary = InvoiceSummary.calculateFromDetails(invoiceDetails)
+        
         // 請求書データの作成
-        const newInvoice = {
+        const invoiceDataWithId = {
           id: invoiceId,
           customerId: invoiceData.customerId,
           customerName: invoiceData.customerName,
           period: invoiceData.period,
           closingDay: invoiceData.closingDay,
           paymentMethod: invoiceData.paymentMethod,
-          summary: invoiceData.summary,
-          details: invoiceData.details,
+          summary: invoiceSummary.toJSON(), // InvoiceSummaryをJSONに変換
+          details: invoiceDetails.map(detail => detail.toJSON()), // InvoiceDetailをJSONに変換
           createdAt: createdAt
         }
+        
+        // Invoiceインスタンスを作成
+        const newInvoice = Invoice.fromData(invoiceDataWithId)
+        
+        // バリデーション
+        newInvoice.validate()
         
         // 月次ファイル名の生成
         const yearMonth = invoiceData.period.replace('年', '-').replace('月分', '')
@@ -254,19 +265,21 @@ export const useInvoicesStore = defineStore('invoices', () => {
         if (!invoicesByMonth[fileName]) {
           invoicesByMonth[fileName] = []
         }
-        invoicesByMonth[fileName].push(newInvoice)
+        // JSON形式で保存するため、toJSON()を使用
+        invoicesByMonth[fileName].push(newInvoice.toJSON())
       }
       
       // 各月次ファイルを更新
       for (const [fileName, monthInvoices] of Object.entries(invoicesByMonth)) {
-        for (const invoice of monthInvoices) {
-          await updateMonthlyInvoices(token, invoicesFolderId, fileName, invoice)
+        for (const invoiceData of monthInvoices) {
+          await updateMonthlyInvoices(token, invoicesFolderId, fileName, invoiceData)
         }
       }
       
-      // ローカルの状態を更新
+      // ローカルの状態を更新（JSON形式からInvoiceインスタンスに変換）
       for (const monthInvoices of Object.values(invoicesByMonth)) {
-        for (const invoice of monthInvoices) {
+        for (const invoiceData of monthInvoices) {
+          const invoice = Invoice.fromData(invoiceData)
           const existingIndex = invoices.value.findIndex(inv => inv.id === invoice.id)
           if (existingIndex !== -1) {
             invoices.value[existingIndex] = invoice
@@ -280,7 +293,8 @@ export const useInvoicesStore = defineStore('invoices', () => {
       if (cachedYear.value) {
         const cachedInvoices = invoicesByYear.value.get(cachedYear.value) || []
         for (const monthInvoices of Object.values(invoicesByMonth)) {
-          for (const invoice of monthInvoices) {
+          for (const invoiceData of monthInvoices) {
+            const invoice = Invoice.fromData(invoiceData)
             const cachedIndex = cachedInvoices.findIndex(inv => inv.id === invoice.id)
             if (cachedIndex !== -1) {
               cachedInvoices[cachedIndex] = invoice
@@ -342,7 +356,9 @@ export const useInvoicesStore = defineStore('invoices', () => {
               const lines = content.split('\n').filter(line => line.trim())
               for (const line of lines) {
                 try {
-                  const invoice = JSON.parse(line)
+                  const invoiceData = JSON.parse(line)
+                  // Invoiceインスタンスに変換
+                  const invoice = Invoice.fromData(invoiceData)
                   
                   // 追加のフィルタリング（クライアント側）
                   let include = true

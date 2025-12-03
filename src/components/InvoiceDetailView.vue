@@ -21,15 +21,15 @@
       <div class="summary-card">
         <div class="summary-row">
           <span class="label">税抜き合計</span>
-          <span class="value">¥{{ formatNumber(invoice.summary.subtotalExclTax) }}</span>
+          <span class="value">¥{{ invoice.summary.formatSubtotal() }}</span>
         </div>
         <div class="summary-row">
           <span class="label">税額</span>
-          <span class="value">¥{{ formatNumber(invoice.summary.totalTax) }}</span>
+          <span class="value">¥{{ invoice.summary.formatTotalTax() }}</span>
         </div>
         <div class="summary-row total">
           <span class="label">合計金額</span>
-          <span class="value">¥{{ formatNumber(invoice.summary.totalInclTax) }}</span>
+          <span class="value">¥{{ invoice.summary.formatTotalInclTax() }}</span>
         </div>
       </div>
     </div>
@@ -54,8 +54,8 @@
           <div class="col-date">{{ formatDate(detail.orderDate) }}</div>
           <div class="col-product">{{ detail.productName }}</div>
           <div class="col-quantity">{{ detail.quantity }}</div>
-          <div class="col-price">¥{{ formatNumber(detail.unitPriceExclTax) }}</div>
-          <div class="col-total">¥{{ formatNumber(detail.subtotalExclTax) }}</div>
+          <div class="col-price">¥{{ detail.formatPrice() }}</div>
+          <div class="col-total">¥{{ detail.formatSubtotal() }}</div>
           <div class="col-tax-rate">{{ formatTaxRate(detail.taxRate) }}</div>
         </div>
       </div>

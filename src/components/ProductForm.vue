@@ -55,7 +55,7 @@
             :key="customer.id"
             :value="customer.id"
           >
-            {{ customer.name }}
+            {{ customer.getDisplayName() }}
           </option>
         </select>
         <small class="form-help">この商品を使用する顧客を選択できます（任意）</small>

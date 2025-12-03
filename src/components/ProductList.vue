@@ -31,7 +31,7 @@
         class="product-card"
       >
         <div class="product-header">
-          <h3 class="product-name">{{ product.name }}</h3>
+          <h3 class="product-name">{{ product.getDisplayName() }}</h3>
           <div class="product-actions">
             <button
               @click="$emit('edit', product)"
@@ -55,7 +55,7 @@
             <strong>管理用名称:</strong> {{ product.alias }}
           </div>
           <div class="product-price">
-            <strong>税抜金額:</strong> ¥{{ formatPrice(product.priceExclTax) }}
+            <strong>税抜金額:</strong> ¥{{ product.formatPrice() }}
           </div>
                       <div v-if="product.usedByCustomerIds && product.usedByCustomerIds.length > 0" class="product-customer">
               <strong>使用顧客:</strong> {{ getCustomerName(product.usedByCustomerIds[0]) }}
@@ -79,7 +79,7 @@
     <div v-if="showDeleteModal" class="modal-overlay" @click="cancelDelete">
       <div class="modal" @click.stop>
         <h3>商品の削除</h3>
-        <p>「{{ productToDelete?.name }}」を削除しますか？</p>
+        <p>「{{ productToDelete?.getDisplayName() }}」を削除しますか？</p>
         <p class="warning">この操作は取り消せません。</p>
         <div class="modal-actions">
           <button
@@ -139,7 +139,7 @@ const filteredProducts = computed(() => {
   
   const query = searchQuery.value.toLowerCase()
   return props.products.filter(product => 
-    product.name.toLowerCase().includes(query) ||
+    product.getDisplayName().toLowerCase().includes(query) ||
     product.alias.toLowerCase().includes(query)
   )
 })
@@ -155,12 +155,7 @@ onMounted(async () => {
 // 顧客名を取得
 const getCustomerName = (customerId) => {
   const customer = customersStore.getCustomerById(customerId)
-  return customer ? customer.name : '不明'
-}
-
-// 価格をフォーマット
-const formatPrice = (price) => {
-  return new Intl.NumberFormat('ja-JP').format(price)
+  return customer ? customer.getDisplayName() : '不明'
 }
 
 // 日付をフォーマット

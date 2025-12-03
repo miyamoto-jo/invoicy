@@ -78,7 +78,7 @@
                     :key="customer.id"
                     :value="customer.id"
                   >
-                    {{ customer.name }}
+                    {{ customer.getDisplayName() }}
                   </option>
                 </select>
               </td>

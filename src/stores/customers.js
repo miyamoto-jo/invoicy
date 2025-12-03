@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
 import { APP_CONFIG } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
+import { Customer } from '../models/Customer.js'
 
 export const useCustomersStore = defineStore('customers', () => {
   // State
@@ -61,19 +62,10 @@ export const useCustomersStore = defineStore('customers', () => {
         for (const line of lines) {
           if (line.trim()) {
             try {
-              const customer = JSON.parse(line)
-              // 必要な情報のみを抽出
-              const essentialCustomer = {
-                id: customer.id,
-                name: customer.name,
-                closingDay: customer.closingDay,
-                paymentMethod: customer.paymentMethod,
-                alias: customer.alias,
-                address: customer.address,
-                createdAt: customer.createdAt,
-                updatedAt: customer.updatedAt
-              }
-              parsedCustomers.push(essentialCustomer)
+              const customerData = JSON.parse(line)
+              // Customerインスタンスに変換
+              const customer = Customer.fromData(customerData)
+              parsedCustomers.push(customer)
             } catch (err) {
               console.warn('Invalid JSON line in customers.jsonl:', line, err)
             }
@@ -103,16 +95,11 @@ export const useCustomersStore = defineStore('customers', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      if (!customerData.name || customerData.name.trim() === '') {
-        throw new Error('顧客名は必須です')
-      }
-      
       // 顧客IDの生成
       const customerId = `cus_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       
       // 顧客データの作成
-      const newCustomer = {
+      const customerDataWithId = {
         id: customerId,
         name: customerData.name.trim(),
         alias: customerData.alias?.trim() || '',
@@ -123,27 +110,22 @@ export const useCustomersStore = defineStore('customers', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // 必要な情報のみを抽出
-      const essentialCustomer = {
-        id: newCustomer.id,
-        name: newCustomer.name,
-        closingDay: newCustomer.closingDay,
-        paymentMethod: newCustomer.paymentMethod,
-        alias: newCustomer.alias,
-        address: newCustomer.address,
-        createdAt: newCustomer.createdAt,
-        updatedAt: newCustomer.updatedAt
-      }
+      // Customerインスタンスを作成
+      const newCustomer = new Customer(customerDataWithId)
+      
+      // バリデーション
+      newCustomer.validateName()
+      newCustomer.validateClosingDay()
       
       // ローカル状態に追加
-      customers.value.push(essentialCustomer)
+      customers.value.push(newCustomer)
       
       // ファイルを更新
       await saveCustomersToFile(token)
       
-      console.log('Customer created successfully:', essentialCustomer)
+      console.log('Customer created successfully:', newCustomer.toJSON())
       
-      return essentialCustomer
+      return newCustomer
       
     } catch (err) {
       console.error('Failed to create customer:', err)
@@ -198,7 +180,7 @@ export const useCustomersStore = defineStore('customers', () => {
           const customerId = `cus_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
           
           // 顧客データの作成
-          const newCustomer = {
+          const customerDataWithId = {
             id: customerId,
             name: customerData.name.trim(),
             alias: customerData.alias?.trim() || '',
@@ -209,21 +191,16 @@ export const useCustomersStore = defineStore('customers', () => {
             updatedAt: new Date().toISOString()
           }
           
-          // 必要な情報のみを抽出
-          const essentialCustomer = {
-            id: newCustomer.id,
-            name: newCustomer.name,
-            closingDay: newCustomer.closingDay,
-            paymentMethod: newCustomer.paymentMethod,
-            alias: newCustomer.alias,
-            address: newCustomer.address,
-            createdAt: newCustomer.createdAt,
-            updatedAt: newCustomer.updatedAt
-          }
+          // Customerインスタンスを作成
+          const newCustomer = new Customer(customerDataWithId)
+          
+          // バリデーション
+          newCustomer.validateName()
+          newCustomer.validateClosingDay()
           
           // ローカル状態に追加
-          customers.value.push(essentialCustomer)
-          createdCustomers.push(essentialCustomer)
+          customers.value.push(newCustomer)
+          createdCustomers.push(newCustomer)
           
         } catch (err) {
           console.error(`Failed to create customer ${customerData.name}:`, err)
@@ -257,20 +234,16 @@ export const useCustomersStore = defineStore('customers', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      if (!customerData.name || customerData.name.trim() === '') {
-        throw new Error('顧客名は必須です')
-      }
-      
       // 既存の顧客を検索
       const customerIndex = customers.value.findIndex(c => c.id === customerId)
       if (customerIndex === -1) {
         throw new Error('顧客が見つかりません')
       }
       
-      // 顧客データを更新
-      const updatedCustomer = {
-        ...customers.value[customerIndex],
+      // 既存の顧客データを取得して更新
+      const existingCustomer = customers.value[customerIndex]
+      const updatedCustomerData = {
+        ...existingCustomer.toJSON(),
         name: customerData.name.trim(),
         alias: customerData.alias?.trim() || '',
         address: customerData.address?.trim() || '',
@@ -279,27 +252,22 @@ export const useCustomersStore = defineStore('customers', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // 必要な情報のみを抽出
-      const essentialCustomer = {
-        id: updatedCustomer.id,
-        name: updatedCustomer.name,
-        closingDay: updatedCustomer.closingDay,
-        paymentMethod: updatedCustomer.paymentMethod,
-        alias: updatedCustomer.alias,
-        address: updatedCustomer.address,
-        createdAt: updatedCustomer.createdAt,
-        updatedAt: updatedCustomer.updatedAt
-      }
+      // Customerインスタンスを作成
+      const updatedCustomer = new Customer(updatedCustomerData)
+      
+      // バリデーション
+      updatedCustomer.validateName()
+      updatedCustomer.validateClosingDay()
       
       // ローカル状態を更新
-      customers.value[customerIndex] = essentialCustomer
+      customers.value[customerIndex] = updatedCustomer
       
       // ファイルを更新
       await saveCustomersToFile(token)
       
-      console.log('Customer updated successfully:', essentialCustomer)
+      console.log('Customer updated successfully:', updatedCustomer.toJSON())
       
-      return essentialCustomer
+      return updatedCustomer
       
     } catch (err) {
       console.error('Failed to update customer:', err)
@@ -401,8 +369,8 @@ export const useCustomersStore = defineStore('customers', () => {
       const appFolder = await authStore.getAppFolderId()
       const customersFile = await getOrCreateCustomersFile(token, appFolder.id)
       
-      // ファイルの内容を更新（JSONL形式）
-      const jsonlContent = customers.value.map(customer => JSON.stringify(customer)).join('\n')
+      // ファイルの内容を更新（JSONL形式、CustomerインスタンスをJSONに変換）
+      const jsonlContent = customers.value.map(customer => JSON.stringify(customer.toJSON())).join('\n')
       await googleApiClient.updateFileContent(token, customersFile.id, jsonlContent)
       
     } catch (err) {

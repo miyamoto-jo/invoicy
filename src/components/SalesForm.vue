@@ -17,7 +17,7 @@
             :key="customer.id" 
             :value="customer.id"
           >
-            {{ customer.name }}
+                {{ customer.getDisplayName() }}
           </option>
         </select>
         <div v-if="errors.customerId" class="error-message">{{ errors.customerId }}</div>
@@ -54,8 +54,8 @@
             @click="addProductToCart(product)"
           >
             <div class="product-card-content">
-              <div class="product-name">{{ product.name }}</div>
-              <div class="product-price">¥{{ formatNumber(product.priceExclTax) }}</div>
+              <div class="product-name">{{ product.getDisplayName() }}</div>
+              <div class="product-price">¥{{ product.formatPrice() }}</div>
               
               <!-- マイナスボタン -->
               <button 
@@ -257,13 +257,8 @@ const availableProducts = computed(() => {
   }
   
   return products.value.filter(product => {
-    // 使用顧客が設定されていない商品（全顧客が使用可能）
-    if (!product.usedByCustomerIds || product.usedByCustomerIds.length === 0) {
-      return true
-    }
-    
-    // 選択した顧客が使用顧客に含まれている商品
-    return product.usedByCustomerIds.includes(formData.value.customerId)
+    // モデルのメソッドを使用
+    return product.isAvailableForCustomer(formData.value.customerId)
   })
 })
 
@@ -393,7 +388,7 @@ const addProductToCart = (product) => {
     // 新しい商品を追加
     selectedProducts.value.push({
       productId: product.id,
-      productName: product.name,
+      productName: product.getDisplayName(), // モデルのメソッドを使用
       alias: product.alias,
       quantity: 1,
       priceExclTax: product.priceExclTax,

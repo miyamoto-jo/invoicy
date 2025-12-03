@@ -4,6 +4,7 @@ import { useAuthStore } from './auth.js'
 import { APP_CONFIG, STORAGE_KEYS } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
 import { useStorage } from '../composables/useStorage.js'
+import { BusinessSettings } from '../models/BusinessSettings.js'
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -41,7 +42,8 @@ export const useSettingsStore = defineStore('settings', () => {
       const cachedSettings = loadFromLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS)
       if (cachedSettings) {
         console.log('✅ Using cached business settings from localStorage')
-        businessSettings.value = cachedSettings
+        // BusinessSettingsインスタンスに変換
+        businessSettings.value = BusinessSettings.fromData(cachedSettings)
         isInitialized.value = true
         return
       }
@@ -108,23 +110,14 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       const settingsData = await googleApiClient.getFileContent(token, fileId)
       
-      // 必要な情報のみを抽出
-      const essentialSettings = {
-        name: settingsData.name,
-        representative: settingsData.representative,
-        number: settingsData.number,
-        bankInfo: settingsData.bankInfo,
-        phone: settingsData.phone,
-        address: settingsData.address,
-        createdAt: settingsData.createdAt,
-        updatedAt: settingsData.updatedAt
-      }
+      // BusinessSettingsインスタンスに変換
+      const businessSettingsInstance = BusinessSettings.fromData(settingsData)
       
       // 事業者設定を直接設定
-      businessSettings.value = essentialSettings || null
+      businessSettings.value = businessSettingsInstance
       
-      // ローカルストレージに保存
-      saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
+      // ローカルストレージに保存（JSON形式で保存）
+      saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, businessSettingsInstance.toJSON())
       
       console.log('Settings loaded successfully and cached:', businessSettings.value)
       
@@ -146,9 +139,6 @@ export const useSettingsStore = defineStore('settings', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      validateBusinessSettings(businessData)
-      
       // 設定データを作成（現在時刻を追加）
       const settingsData = {
         ...businessData,
@@ -156,23 +146,17 @@ export const useSettingsStore = defineStore('settings', () => {
         updatedAt: new Date().toISOString()
       }
       
-      // 必要な情報のみを抽出
-      const essentialSettings = {
-        name: settingsData.name,
-        representative: settingsData.representative,
-        number: settingsData.number,
-        bankInfo: settingsData.bankInfo,
-        phone: settingsData.phone,
-        address: settingsData.address,
-        createdAt: settingsData.createdAt,
-        updatedAt: settingsData.updatedAt
-      }
+      // BusinessSettingsインスタンスを作成
+      const businessSettingsInstance = new BusinessSettings(settingsData)
       
-      // ローカルストレージに保存
-      saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
+      // バリデーション
+      businessSettingsInstance.validate()
+      
+      // ローカルストレージに保存（JSON形式で保存）
+      saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, businessSettingsInstance.toJSON())
       
       // 事業者設定を設定
-      businessSettings.value = essentialSettings
+      businessSettings.value = businessSettingsInstance
       
       // setting.jsonファイルを作成
       const appFolder = await authStore.ensureAppFolder(token)
@@ -189,7 +173,7 @@ export const useSettingsStore = defineStore('settings', () => {
       console.log('Settings file created:', createdFile.id)
       
       // ファイルの内容を更新
-      await googleApiClient.updateFileContent(token, createdFile.id, settingsData)
+      await googleApiClient.updateFileContent(token, createdFile.id, businessSettingsInstance.toJSON())
       
       console.log('Business settings created successfully and cached')
       
@@ -216,9 +200,6 @@ export const useSettingsStore = defineStore('settings', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      validateBusinessSettings(businessData)
-      
       // 既存の設定ファイルを検索
       const appFolder = await authStore.ensureAppFolder(token)
       const searchQuery = `name='${APP_CONFIG.FILES.SETTING}' and '${appFolder.id}' in parents and trashed=false`
@@ -231,34 +212,33 @@ export const useSettingsStore = defineStore('settings', () => {
       const fileId = searchResult.files[0].id
       
       // 既存の設定を取得して更新
-      const existingSettings = businessSettings.value || {}
+      const existingSettings = businessSettings.value
       const settingsData = {
-        ...existingSettings,
+        ...(existingSettings ? existingSettings.toJSON() : {}),
         ...businessData,
         updatedAt: new Date().toISOString()
       }
-
-      // 必要な情報のみを抽出
-      const essentialSettings = {
-        name: settingsData.name,
-        representative: settingsData.representative,
-        number: settingsData.number,
-        bankInfo: settingsData.bankInfo,
-        phone: settingsData.phone,
-        address: settingsData.address,
-        createdAt: settingsData.createdAt,
-        updatedAt: settingsData.updatedAt
+      
+      // createdAtが存在しない場合は現在時刻を設定
+      if (!settingsData.createdAt) {
+        settingsData.createdAt = new Date().toISOString()
       }
+
+      // BusinessSettingsインスタンスを作成
+      const businessSettingsInstance = new BusinessSettings(settingsData)
+      
+      // バリデーション
+      businessSettingsInstance.validate()
       
       // ファイルの内容を更新
-      await googleApiClient.updateFileContent(token, fileId, settingsData)
+      await googleApiClient.updateFileContent(token, fileId, businessSettingsInstance.toJSON())
       console.log('Settings file updated:', fileId)
 
-      // ローカルストレージに保存
-      saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, essentialSettings)
+      // ローカルストレージに保存（JSON形式で保存）
+      saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, businessSettingsInstance.toJSON())
       
       // 状態を更新
-      businessSettings.value = settingsData
+      businessSettings.value = businessSettingsInstance
       
       return { id: fileId }
       
@@ -271,27 +251,6 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
   
-  const validateBusinessSettings = (businessData) => {
-    const errors = []
-    
-    if (!businessData.name || businessData.name.trim() === '') {
-      errors.push('事業者名は必須です')
-    }
-    
-    if (!businessData.number || businessData.number.trim() === '') {
-      errors.push('事業者番号は必須です')
-    } else if (!businessData.number.startsWith('T')) {
-      errors.push('事業者番号はTから始まる必要があります')
-    }
-    
-    if (!businessData.representative || businessData.representative.trim() === '') {
-      errors.push('代表者名は必須です')
-    }
-    
-    if (errors.length > 0) {
-      throw new Error(errors.join(', '))
-    }
-  }
   
   const resetSettings = () => {
     businessSettings.value = null

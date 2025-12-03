@@ -3,6 +3,9 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
 import { APP_CONFIG } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
+import { Sale } from '../models/Sale.js'
+import { SaleLine } from '../models/SaleLine.js'
+import { SaleTotals } from '../models/SaleTotals.js'
 
 export const useSalesStore = defineStore('sales', () => {
   // State
@@ -66,7 +69,9 @@ export const useSalesStore = defineStore('sales', () => {
               const lines = content.split('\n').filter(line => line.trim())
               for (const line of lines) {
                 try {
-                  const sale = JSON.parse(line)
+                  const saleData = JSON.parse(line)
+                  // Saleインスタンスに変換
+                  const sale = Sale.fromData(saleData)
                   salesData.push(sale)
                 } catch (parseErr) {
                   console.warn('Failed to parse sale line:', line, parseErr)
@@ -100,15 +105,6 @@ export const useSalesStore = defineStore('sales', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      if (!saleData.customerId) {
-        throw new Error('顧客を選択してください')
-      }
-      
-      if (!saleData.lines || saleData.lines.length === 0) {
-        throw new Error('商品を1つ以上追加してください')
-      }
-      
       // 伝票IDの生成
       const ticketId = `tkt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       
@@ -117,21 +113,30 @@ export const useSalesStore = defineStore('sales', () => {
       const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
       const createdAt = jstNow.toISOString().replace('Z', '+09:00')
       
+      // linesをSaleLineインスタンスの配列に変換
+      const saleLines = saleData.lines.map(lineData => SaleLine.fromData(lineData))
+      
       // 税額計算
-      const totals = calculateTotals(saleData.lines)
+      const totals = SaleTotals.calculateFromLines(saleLines)
       
       // 売上データの作成
-      const newSale = {
+      const saleDataWithId = {
         id: ticketId,
         customerId: saleData.customerId,
         issuedOn: saleData.issuedOn,
-        lines: saleData.lines,
+        lines: saleLines.map(line => line.toJSON()), // SaleLineをJSONに変換
         note: saleData.note || '',
-        totals: totals,
+        totals: totals.toJSON(), // SaleTotalsをJSONに変換
         isNegative: saleData.isNegative || false,
         negatesTicketId: saleData.negatesTicketId || null,
         createdAt: createdAt
       }
+      
+      // Saleインスタンスを作成
+      const newSale = Sale.fromData(saleDataWithId)
+      
+      // バリデーション
+      newSale.validate()
       
       // アプリフォルダの取得
       const appFolder = await authStore.getAppFolderId()
@@ -151,8 +156,8 @@ export const useSalesStore = defineStore('sales', () => {
       const createResponse = await googleApiClient.createFile(token, fileData)
       const file = await createResponse.json()
       
-      // ファイルの内容を設定
-      await googleApiClient.updateFileContent(token, file.id, newSale)
+      // ファイルの内容を設定（SaleインスタンスをJSONに変換）
+      await googleApiClient.updateFileContent(token, file.id, newSale.toJSON())
       
       // ローカルの状態を更新
       sales.value.unshift(newSale)
@@ -193,15 +198,6 @@ export const useSalesStore = defineStore('sales', () => {
       const salesByMonth = {}
       
       for (const saleData of salesDataArray) {
-        // バリデーション
-        if (!saleData.customerId) {
-          throw new Error('顧客を選択してください')
-        }
-        
-        if (!saleData.lines || saleData.lines.length === 0) {
-          throw new Error('商品を1つ以上追加してください')
-        }
-        
         // 伝票IDの生成
         const ticketId = `tkt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         
@@ -210,21 +206,30 @@ export const useSalesStore = defineStore('sales', () => {
         const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
         const createdAt = jstNow.toISOString().replace('Z', '+09:00')
         
+        // linesをSaleLineインスタンスの配列に変換
+        const saleLines = saleData.lines.map(lineData => SaleLine.fromData(lineData))
+        
         // 税額計算
-        const totals = calculateTotals(saleData.lines)
+        const totals = SaleTotals.calculateFromLines(saleLines)
         
         // 売上データの作成
-        const newSale = {
+        const saleDataWithId = {
           id: ticketId,
           customerId: saleData.customerId,
           issuedOn: saleData.issuedOn,
-          lines: saleData.lines,
+          lines: saleLines.map(line => line.toJSON()), // SaleLineをJSONに変換
           note: saleData.note || '',
-          totals: totals,
+          totals: totals.toJSON(), // SaleTotalsをJSONに変換
           isNegative: saleData.isNegative || false,
           negatesTicketId: saleData.negatesTicketId || null,
           createdAt: createdAt
         }
+        
+        // Saleインスタンスを作成
+        const newSale = Sale.fromData(saleDataWithId)
+        
+        // バリデーション
+        newSale.validate()
         
         // 月次ファイル名の生成（YYYYMM）
         const yearMonth = saleData.issuedOn.substring(0, 7).replace('-', '')
@@ -233,17 +238,20 @@ export const useSalesStore = defineStore('sales', () => {
         if (!salesByMonth[fileName]) {
           salesByMonth[fileName] = []
         }
-        salesByMonth[fileName].push(newSale)
+        // JSON形式で保存するため、toJSON()を使用
+        salesByMonth[fileName].push(newSale.toJSON())
       }
       
       // 各月次ファイルを更新
-      for (const [fileName, sales] of Object.entries(salesByMonth)) {
-        await updateMonthlyLedger(token, salesFolder.id, fileName, sales)
+      for (const [fileName, monthSales] of Object.entries(salesByMonth)) {
+        await updateMonthlyLedger(token, salesFolder.id, fileName, monthSales)
       }
       
       // ローカルの状態を更新（新しく作成された売上を追加）
+      // JSON形式からSaleインスタンスに変換
       for (const monthSales of Object.values(salesByMonth)) {
-        sales.value.unshift(...monthSales)
+        const saleInstances = monthSales.map(saleData => Sale.fromData(saleData))
+        sales.value.unshift(...saleInstances)
       }
       
       return salesDataArray.length
@@ -297,7 +305,9 @@ export const useSalesStore = defineStore('sales', () => {
               const lines = content.split('\n').filter(line => line.trim())
               for (const line of lines) {
                 try {
-                  const sale = JSON.parse(line)
+                  const saleData = JSON.parse(line)
+                  // Saleインスタンスに変換
+                  const sale = Sale.fromData(saleData)
                   
                   // 追加のフィルタリング（クライアント側）
                   let include = true
@@ -404,34 +414,7 @@ export const useSalesStore = defineStore('sales', () => {
     }
   }
   
-  // ヘルパー関数
-  const calculateTotals = (lines) => {
-    let subtotalExclTax = 0
-    const taxByRate = {}
-    
-    lines.forEach(line => {
-      const lineTotal = line.quantity * line.priceExclTax
-      subtotalExclTax += lineTotal
-      
-      // 税額計算（切り捨て）
-      const taxAmount = Math.floor(lineTotal * (line.taxRate / 100))
-      if (taxByRate[line.taxRate]) {
-        taxByRate[line.taxRate] += taxAmount
-      } else {
-        taxByRate[line.taxRate] = taxAmount
-      }
-    })
-    
-    const totalTax = Object.values(taxByRate).reduce((sum, tax) => sum + tax, 0)
-    const totalInclTax = subtotalExclTax + totalTax
-    
-    return {
-      subtotalExclTax,
-      taxByRate,
-      totalTax,
-      totalInclTax
-    }
-  }
+  // ヘルパー関数（calculateTotalsはSaleTotals.calculateFromLines()に置き換えられました）
   
   // Google Drive API ヘルパー関数
   const getOrCreateSalesFolder = async (token, appFolderId) => {
@@ -469,8 +452,10 @@ export const useSalesStore = defineStore('sales', () => {
           const lines = content.split('\n').filter(line => line.trim())
           for (const line of lines) {
             try {
-              const sale = JSON.parse(line)
-              existingSales.push(sale)
+              const saleData = JSON.parse(line)
+              // Saleインスタンスに変換
+              const sale = Sale.fromData(saleData)
+              existingSales.push(sale.toJSON()) // JSON形式で保存
             } catch (parseErr) {
               console.warn('Failed to parse sale line:', line, parseErr)
             }

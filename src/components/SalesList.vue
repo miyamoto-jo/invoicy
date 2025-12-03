@@ -37,7 +37,7 @@
               :key="customer.id" 
               :value="customer.id"
             >
-              {{ customer.name }}
+              {{ customer.getDisplayName() }}
             </option>
           </select>
         </div>
@@ -55,7 +55,7 @@
               :key="product.id" 
               :value="product.id"
             >
-              {{ product.name }}
+              {{ product.getDisplayName() }}
             </option>
           </select>
         </div>
@@ -114,8 +114,8 @@
               <td>{{ formatDate(sale.issuedOn) }}</td>
               <td>{{ getCustomerName(sale.customerId) }}</td>
               <td>{{ sale.lines.length }}品目</td>
-              <td>¥{{ formatNumber(sale.totals.subtotalExclTax) }}</td>
-              <td>¥{{ formatNumber(sale.totals.totalInclTax) }}</td>
+              <td>¥{{ sale.totals.formatSubtotal() }}</td>
+              <td>¥{{ sale.totals.formatTotalInclTax() }}</td>
               <td>
                 <span v-if="sale.note" class="note-text" :title="sale.note">
                   {{ truncateText(sale.note, 20) }}
@@ -194,11 +194,11 @@
                 <tr v-for="line in selectedSale.lines" :key="`${selectedSale.id}-${line.productId}`">
                   <td>{{ line.productName }}</td>
                   <td>{{ line.quantity }}</td>
-                  <td>¥{{ formatNumber(line.priceExclTax) }}</td>
+                  <td>¥{{ line.formatPrice() }}</td>
                   <td>{{ line.taxRate }}%</td>
-                  <td>¥{{ formatNumber(line.quantity * line.priceExclTax) }}</td>
-                  <td>¥{{ formatNumber(Math.floor((line.quantity * line.priceExclTax) * (line.taxRate / 100))) }}</td>
-                  <td>¥{{ formatNumber((line.quantity * line.priceExclTax) + Math.floor((line.quantity * line.priceExclTax) * (line.taxRate / 100))) }}</td>
+                  <td>¥{{ line.calculateSubtotalExclTax().toLocaleString() }}</td>
+                  <td>¥{{ line.calculateTaxAmount().toLocaleString() }}</td>
+                  <td>¥{{ line.calculateSubtotalInclTax().toLocaleString() }}</td>
                 </tr>
               </tbody>
             </table>
@@ -207,15 +207,15 @@
           <div class="sale-totals">
             <div class="total-row">
               <span class="total-label">税抜合計:</span>
-              <span class="total-value">¥{{ formatNumber(selectedSale.totals.subtotalExclTax) }}</span>
+              <span class="total-value">¥{{ selectedSale.totals.formatSubtotal() }}</span>
             </div>
             <div v-for="(taxAmount, rate) in selectedSale.totals.taxByRate" :key="rate" class="total-row">
               <span class="total-label">消費税（{{ rate }}%）:</span>
-              <span class="total-value">¥{{ formatNumber(taxAmount) }}</span>
+              <span class="total-value">¥{{ new Intl.NumberFormat('ja-JP').format(taxAmount) }}</span>
             </div>
             <div class="total-row total-row-main">
               <span class="total-label">税込合計:</span>
-              <span class="total-value">¥{{ formatNumber(selectedSale.totals.totalInclTax) }}</span>
+              <span class="total-value">¥{{ selectedSale.totals.formatTotalInclTax() }}</span>
             </div>
           </div>
         </div>
@@ -369,7 +369,7 @@ const deleteSale = async (saleId) => {
 
 const getCustomerName = (customerId) => {
   const customer = customers.value.find(c => c.id === customerId)
-  return customer ? customer.name : '不明な顧客'
+  return customer ? customer.getDisplayName() : '不明な顧客'
 }
 
 const formatDate = (dateString) => {

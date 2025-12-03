@@ -114,7 +114,7 @@
               />
               <span class="checkmark"></span>
               <div class="customer-info">
-                <div class="customer-name">{{ customer.name }}</div>
+                <div class="customer-name">{{ customer.getDisplayName() }}</div>
                 <div class="customer-details">
                   <span class="closing-day">締め日: {{ customer.closingDay }}</span>
                   <span class="payment-method">{{ customer.paymentMethod }}</span>
@@ -336,7 +336,7 @@ const toggleSelectAll = () => {
 
 const getCustomerName = (customerId) => {
   const customer = customers.value.find(c => c.id === customerId)
-  return customer ? customer.name : '不明な顧客'
+  return customer ? customer.getDisplayName() : '不明な顧客'
 }
 
 const getCustomerClosingDay = (customerId) => {
@@ -396,10 +396,10 @@ const calculateInvoiceData = async (customerId) => {
   })
 
   if (targetSales.length === 0) {
-    throw new Error(`${customer.name}の対象期間に売上データがありません`)
+    throw new Error(`${customer.getDisplayName()}の対象期間に売上データがありません`)
   }
 
-  // 明細データの生成
+  // 明細データの生成（SaleLineのメソッドを使用）
   const details = []
   targetSales.forEach(sale => {
     sale.lines.forEach(line => {
@@ -408,8 +408,8 @@ const calculateInvoiceData = async (customerId) => {
         productName: line.productName,
         quantity: line.quantity,
         unitPriceExclTax: line.priceExclTax,
-        taxRate: line.taxRate, // taxRateを追加
-        subtotalExclTax: line.quantity * line.priceExclTax
+        taxRate: line.taxRate,
+        subtotalExclTax: line.calculateSubtotalExclTax() // モデルのメソッドを使用
       })
     })
   })
@@ -435,7 +435,7 @@ const calculateInvoiceData = async (customerId) => {
 
   return {
     customerId: customer.id,
-    customerName: customer.name,
+    customerName: customer.getDisplayName(),
     period: `${formData.value.targetYear}年${formData.value.targetMonth}月分`,
     closingDay: customer.closingDay,
     paymentMethod: customer.paymentMethod,

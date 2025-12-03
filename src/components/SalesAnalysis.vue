@@ -49,7 +49,7 @@
                 :key="customer.id" 
                 :value="customer.id"
               >
-                {{ customer.name }}
+                {{ customer.getDisplayName() }}
               </option>
             </select>
           </div>
@@ -201,9 +201,9 @@
                 <tr v-for="line in selectedSale.lines" :key="`${selectedSale.id}-${line.productId}`">
                   <td>{{ line.productName }}</td>
                   <td>{{ line.quantity }}</td>
-                  <td>¥{{ formatNumber(line.priceExclTax) }}</td>
+                  <td>¥{{ line.formatPrice() }}</td>
                   <td>{{ line.taxRate }}%</td>
-                  <td>¥{{ formatNumber((line.quantity * line.priceExclTax) + Math.floor((line.quantity * line.priceExclTax) * (line.taxRate / 100))) }}</td>
+                  <td>¥{{ line.calculateSubtotalInclTax().toLocaleString() }}</td>
                 </tr>
               </tbody>
             </table>
@@ -212,15 +212,15 @@
           <div class="sale-totals">
             <div class="total-row">
               <span class="total-label">税抜合計:</span>
-              <span class="total-value">¥{{ formatNumber(selectedSale.totals.subtotalExclTax) }}</span>
+              <span class="total-value">¥{{ selectedSale.totals.formatSubtotal() }}</span>
             </div>
             <div v-for="(taxAmount, rate) in selectedSale.totals.taxByRate" :key="rate" class="total-row">
               <span class="total-label">消費税（{{ rate }}%）:</span>
-              <span class="total-value">¥{{ formatNumber(taxAmount) }}</span>
+              <span class="total-value">¥{{ new Intl.NumberFormat('ja-JP').format(taxAmount) }}</span>
             </div>
             <div class="total-row total-row-main">
               <span class="total-label">税込合計:</span>
-              <span class="total-value">¥{{ formatNumber(selectedSale.totals.totalInclTax) }}</span>
+              <span class="total-value">¥{{ selectedSale.totals.formatTotalInclTax() }}</span>
             </div>
           </div>
         </div>
@@ -372,7 +372,7 @@ const closeSaleDetails = () => {
 
 const getCustomerName = (customerId) => {
   const customer = customers.value.find(c => c.id === customerId)
-  return customer ? customer.name : '不明な顧客'
+  return customer ? customer.getDisplayName() : '不明な顧客'
 }
 
 const formatDate = (dateString) => {

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
 import { APP_CONFIG } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
+import { Tax } from '../models/Tax.js'
 
 export const useTaxesStore = defineStore('taxes', () => {
   // State
@@ -88,16 +89,11 @@ export const useTaxesStore = defineStore('taxes', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      if (taxData.rate === undefined || taxData.rate === null || taxData.rate < 0) {
-        throw new Error('税率は0以上の数値で入力してください')
-      }
-      
       // 税率IDの生成
       const taxId = `tax_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       
       // 税率データの作成
-      const newTax = {
+      const taxDataWithId = {
         id: taxId,
         rate: parseFloat(taxData.rate),
         description: taxData.description?.trim() || '',
@@ -105,6 +101,12 @@ export const useTaxesStore = defineStore('taxes', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
+      
+      // Taxインスタンスを作成
+      const newTax = new Tax(taxDataWithId)
+      
+      // バリデーション
+      newTax.validateRate()
       
       // ローカル状態を更新
       taxes.value.push(newTax)
@@ -135,25 +137,27 @@ export const useTaxesStore = defineStore('taxes', () => {
         throw new Error('認証トークンがありません')
       }
       
-      // バリデーション
-      if (taxData.rate === undefined || taxData.rate === null || taxData.rate < 0) {
-        throw new Error('税率は0以上の数値で入力してください')
-      }
-      
       // 税率を検索
       const taxIndex = taxes.value.findIndex(tax => tax.id === taxId)
       if (taxIndex === -1) {
         throw new Error('税率が見つかりません')
       }
       
-      // 税率データの更新
-      const updatedTax = {
-        ...taxes.value[taxIndex],
+      // 既存の税率データを取得して更新
+      const existingTax = taxes.value[taxIndex]
+      const updatedTaxData = {
+        ...existingTax.toJSON(),
         rate: parseFloat(taxData.rate),
         description: taxData.description?.trim() || '',
         isActive: taxData.isActive !== false,
         updatedAt: new Date().toISOString()
       }
+      
+      // Taxインスタンスを作成
+      const updatedTax = new Tax(updatedTaxData)
+      
+      // バリデーション
+      updatedTax.validateRate()
       
       // ローカル状態を更新
       taxes.value[taxIndex] = updatedTax
@@ -313,9 +317,9 @@ export const useTaxesStore = defineStore('taxes', () => {
       const appFolder = await authStore.getAppFolderId()
       const taxesFile = await getOrCreateTaxesFile(token, appFolder.id)
       
-      // 新しい形式でデータを構築
+      // 新しい形式でデータを構築（TaxインスタンスをJSONに変換）
       const taxesData = {
-        taxes: taxes.value,
+        taxes: taxes.value.map(tax => tax.toJSON()),
         rounding: rounding.value,
         default_tax_id: defaultTaxId.value,
         lastUpdated: new Date().toISOString()
@@ -339,10 +343,11 @@ export const useTaxesStore = defineStore('taxes', () => {
         // オブジェクト形式の場合（新しい形式）
         rounding.value = content.rounding || 'floor'
         defaultTaxId.value = content.default_tax_id || 'tax_10'
-        taxes.value = content.taxes || []
+        // Taxインスタンスに変換
+        taxes.value = (content.taxes || []).map(taxData => Tax.fromData(taxData))
       } else if (content && Array.isArray(content)) {
         // 配列形式の場合（古い形式）
-        taxes.value = content
+        taxes.value = content.map(taxData => Tax.fromData(taxData))
         rounding.value = 'floor'
         defaultTaxId.value = 'tax_10'
       } else {
@@ -377,9 +382,9 @@ export const useTaxesStore = defineStore('taxes', () => {
       const appFolder = await authStore.getAppFolderId()
       const taxesFile = await getOrCreateTaxesFile(token, appFolder.id)
       
-      // 新しい形式でデータを構築
+      // 新しい形式でデータを構築（TaxインスタンスをJSONに変換）
       const taxesData = {
-        taxes: taxes.value,
+        taxes: taxes.value.map(tax => tax.toJSON()),
         rounding: newRounding,
         default_tax_id: newDefaultTaxId,
         lastUpdated: new Date().toISOString()

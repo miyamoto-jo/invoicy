@@ -43,7 +43,7 @@
         @click="selectCustomer(customer)"
       >
         <div class="customer-header">
-          <h4 class="customer-name">{{ customer.name }}</h4>
+          <h4 class="customer-name">{{ customer.getDisplayName() }}</h4>
           <div class="customer-actions">
             <button
               @click.stop="editCustomer(customer)"
@@ -73,7 +73,7 @@
           </div>
           <div class="customer-closing-day">
             <span class="label">締め日:</span>
-            <span>{{ customer.closingDay === '末日' ? '末日' : customer.closingDay + '日' }}</span>
+            <span>{{ customer.formatClosingDay() }}</span>
           </div>
           <div class="customer-payment-method">
             <span class="label">お支払い方法:</span>
@@ -128,7 +128,7 @@ const editCustomer = (customer) => {
 }
 
 const deleteCustomer = async (customer) => {
-  if (confirm(`「${customer.name}」を削除しますか？\nこの操作は取り消せません。`)) {
+  if (confirm(`「${customer.getDisplayName()}」を削除しますか？\nこの操作は取り消せません。`)) {
     emit('delete', customer)
   }
 }

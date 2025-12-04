@@ -9,11 +9,11 @@ Invoicyは、Google Driveをデータストレージとして使用するクラ�
 ## 機能
 
 - ✅ Googleアカウント認証
-- 🔄 顧客管理（開発中）
-- 🔄 商品管理（開発中）
-- 🔄 税率管理（開発中）
-- 🔄 売上管理（開発中）
-- 🔄 請求書作成（開発中）
+- ✅ 顧客管理
+- ✅ 商品管理
+- ✅ 税率管理
+- ✅ 売上管理
+- ✅ 請求書作成
 
 ## 技術スタック
 
@@ -111,38 +111,25 @@ npm run build
 
 ```
 src/
-├── components/     # 再利用可能なコンポーネント
-├── views/         # ページコンポーネント
-├── stores/        # Piniaストア
-├── router/        # Vue Router設定
-├── utils/         # ユーティリティ関数
-└── style.css      # グローバルスタイル
-```
-
-### 認証ストアの使用
-
-```javascript
-import { useAuthStore } from '@/stores/auth'
-
-const authStore = useAuthStore()
-
-// 認証状態の確認
-if (authStore.isAuthenticated) {
-  // 認証済みの場合の処理
-}
-
-// アクセストークンの取得
-const token = authStore.getAccessToken()
-
-// サインアウト
-authStore.signOut()
+├── assets/           # 画像・リソースファイル
+├── components/       # 再利用可能なコンポーネント
+├── composables/     # コンポーザブル関数
+├── config/          # 設定ファイル
+├── models/          # ドメインモデル
+├── router/         # Vue Router設定
+├── services/       # APIサービス
+├── stores/         # Piniaストア
+├── views/          # ページコンポーネント
+├── App.vue         # ルートコンポーネント
+├── main.js         # エントリーポイント
+└── style.css       # グローバルスタイル
 ```
 
 ## 注意事項
 
 - このアプリケーションは**オンライン前提**で動作します
 - データはGoogle Driveに保存されます
-- 初回使用時はGoogle Driveに専用フォルダが作成されます
+- 初回使用時はGoogle Driveに専用フォルダ（Invoicy）が作成されます
 - 認証トークンはセッションストレージに保存されます（ブラウザを閉じると失効）
 - **プライベートブラウズモード（シークレットモード）での利用は推奨しません** - セッションストレージ、ローカルストレージの制限により、認証状態が正常に保持されない場合があります
 
@@ -150,6 +137,3 @@ authStore.signOut()
 
 MIT License
 
-## 貢献
-
-プルリクエストやイシューの報告を歓迎します。

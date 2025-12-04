@@ -31,7 +31,7 @@
       <div v-if="isLoading" class="loading-overlay">
         <div class="loading-content">
           <div class="spinner"></div>
-          <p>データを読み込み中...</p>
+          <p>データを分析中...</p>
         </div>
       </div>
 
@@ -671,7 +671,7 @@ onMounted(() => {
 
 .mode-selection {
   display: flex;
-  gap: 2rem;
+  gap: 1rem;
   justify-content: center;
   margin-bottom: 2rem;
   padding: 1rem;
@@ -681,17 +681,53 @@ onMounted(() => {
 }
 
 .radio-label {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
   cursor: pointer;
-  font-size: 1rem;
+  flex: 1;
+  max-width: 200px;
 }
 
 .radio-label input[type="radio"] {
-  width: 1.2rem;
-  height: 1.2rem;
-  cursor: pointer;
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.radio-label span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+  background: #f8f9fa;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.radio-label:hover span {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.radio-label input[type="radio"]:checked + span {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.radio-label input[type="radio"]:focus + span {
+  outline: 2px solid #80bdff;
+  outline-offset: 2px;
 }
 
 .loading-overlay {
@@ -776,6 +812,7 @@ onMounted(() => {
 
 .date-display .placeholder {
   color: #999;
+  font-size: 0.9rem;
 }
 
 .date-display .arrow {
@@ -1026,9 +1063,18 @@ onMounted(() => {
   }
 
   .mode-selection {
-    flex-direction: column;
-    gap: 1rem;
+    flex-direction: row;
+    gap: 0.75rem;
     margin: 1rem;
+  }
+
+  .radio-label {
+    max-width: none;
+  }
+
+  .radio-label span {
+    padding: 0.625rem 1rem;
+    font-size: 0.9rem;
   }
 
   .analytics-content {

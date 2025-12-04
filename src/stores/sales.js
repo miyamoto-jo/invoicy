@@ -352,10 +352,25 @@ export const useSalesStore = defineStore('sales', () => {
       let query = `'${salesFolder.id}' in parents and name contains 'ledger-' and trashed=false`
       
       // 期間フィルタ（月次ファイル名で絞り込み）
+      // Google Drive APIの文字列比較（>=, <=）は正しく動作しないため、
+      // name containsを使用して年を含むファイルを検索し、クライアント側でフィルタリング
       if (filters.fromDate && filters.toDate) {
-        const fromYearMonth = filters.fromDate.substring(0, 7).replace('-', '')
-        const toYearMonth = filters.toDate.substring(0, 7).replace('-', '')
-        query += ` and name >= 'ledger-${fromYearMonth}.jsonl' and name <= 'ledger-${toYearMonth}.jsonl'`
+        const fromYear = filters.fromDate.substring(0, 4)
+        const toYear = filters.toDate.substring(0, 4)
+        
+        // 同じ年の場合は、その年のファイルを検索
+        if (fromYear === toYear) {
+          query += ` and name contains 'ledger-${fromYear}'`
+        } else {
+          // 複数年にまたがる場合は、範囲内の年のファイルを検索（OR条件）
+          const yearConditions = []
+          for (let year = parseInt(fromYear); year <= parseInt(toYear); year++) {
+            yearConditions.push(`name contains 'ledger-${year}'`)
+          }
+          if (yearConditions.length > 0) {
+            query += ` and (${yearConditions.join(' or ')})`
+          }
+        }
       }
       
       const data = await googleApiClient.searchFiles(token, query, 'files(id,name)', 'name desc')

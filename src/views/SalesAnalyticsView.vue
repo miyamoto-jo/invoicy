@@ -49,8 +49,6 @@
             type="number" 
             v-model.number="selectedYear"
             @change="loadYearlyData"
-            min="2000"
-            max="2100"
             class="year-input"
           />
         </div>
@@ -119,7 +117,7 @@
               </thead>
               <tbody>
                 <tr v-for="(product, index) in productAnalysis" :key="product.productId">
-                  <td>{{ index + 1 }}</td>
+                  <td>{{ formatRank(index + 1) }}</td>
                   <td>{{ product.productId }}</td>
                   <td>{{ product.displayName }}</td>
                   <td>{{ product.quantity }}</td>
@@ -265,7 +263,7 @@
               </thead>
               <tbody>
                 <tr v-for="(product, index) in productAnalysis" :key="product.productId">
-                  <td>{{ index + 1 }}</td>
+                  <td>{{ formatRank(index + 1) }}</td>
                   <td>{{ product.productId }}</td>
                   <td>{{ product.displayName }}</td>
                   <td>{{ product.quantity }}</td>
@@ -557,12 +555,22 @@ const loadYearlyData = async () => {
 
     // マスターデータの読み込み（既にインメモリにある場合はスキップ）
     if (inMemoryCustomers.value.length === 0) {
+      console.log('[テスト] 顧客マスター取得開始')
       await customersStore.loadCustomers()
       inMemoryCustomers.value = [...customersStore.customers]
+      console.log('[テスト] 顧客マスター取得完了:', inMemoryCustomers.value.length, '件')
+      console.log('[テスト] 顧客マスターがインメモリに保存されました:', inMemoryCustomers.value.length > 0)
+    } else {
+      console.log('[テスト] 顧客マスターは既にインメモリに存在します:', inMemoryCustomers.value.length, '件')
     }
     if (inMemoryProducts.value.length === 0) {
+      console.log('[テスト] 商品マスター取得開始')
       await productsStore.loadProducts()
       inMemoryProducts.value = [...productsStore.products]
+      console.log('[テスト] 商品マスター取得完了:', inMemoryProducts.value.length, '件')
+      console.log('[テスト] 商品マスターがインメモリに保存されました:', inMemoryProducts.value.length > 0)
+    } else {
+      console.log('[テスト] 商品マスターは既にインメモリに存在します:', inMemoryProducts.value.length, '件')
     }
 
     // 年間の売上データを取得
@@ -639,6 +647,13 @@ const selectMonth = (month) => {
 
 const formatNumber = (num) => {
   return new Intl.NumberFormat('ja-JP').format(num)
+}
+
+const formatRank = (rank) => {
+  if (rank === 1) return '🥇'
+  if (rank === 2) return '🥈'
+  if (rank === 3) return '🥉'
+  return rank
 }
 
 // Lifecycle

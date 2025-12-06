@@ -10,6 +10,7 @@ import ProductsView from '../views/ProductsView.vue'
 import TaxesView from '../views/TaxesView.vue'
 import SalesView from '../views/SalesView.vue'
 import SalesListView from '../views/SalesListView.vue'
+import SalesAnalyticsView from '../views/SalesAnalyticsView.vue'
 import InvoicesView from '../views/InvoicesView.vue'
 
 const routes = [
@@ -50,15 +51,21 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/sales',
-    name: 'sales',
-    component: SalesView,
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/sales/list',
     name: 'sales-list',
     component: SalesListView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/sales/analytics',
+    name: 'sales-analytics',
+    component: SalesAnalyticsView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/sales',
+    name: 'sales',
+    component: SalesView,
     meta: { requiresAuth: true }
   },
   {

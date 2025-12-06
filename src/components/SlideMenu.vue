@@ -89,6 +89,15 @@
             <div class="menu-icon settings-icon">🏢</div>
             <span class="menu-text">事業者設定</span>
           </router-link>
+          <router-link 
+            to="/data-deletion" 
+            class="menu-item" 
+            :class="{ 'low-storage': isLowStorage }"
+            @click="closeMenu"
+          >
+            <div class="menu-icon deletion-icon">🗑️</div>
+            <span class="menu-text">データ削除</span>
+          </router-link>
           <button class="menu-item signout-button" @click="showSignOutModal">
             <div class="menu-icon signout-icon">👋</div>
             <span class="menu-text">サインアウト</span>
@@ -121,10 +130,14 @@
 </template>
 
 <script setup>
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/setting'
 import { useRouter } from 'vue-router'
+import { STORAGE_KEYS } from '../config/api.js'
+import { useStorage } from '../composables/useStorage.js'
+
+const { loadFromLocalStorage } = useStorage()
 
 const props = defineProps({
   isOpen: {
@@ -140,6 +153,24 @@ const settingsStore = useSettingsStore()
 const router = useRouter()
 
 const showModal = ref(false)
+
+// 容量が3GB未満かどうかを判定
+const isLowStorage = computed(() => {
+  try {
+    const userInfo = loadFromLocalStorage(STORAGE_KEYS.USER_INFO)
+    if (!userInfo || !userInfo.storage_quota) {
+      return false
+    }
+    
+    const remaining = userInfo.storage_quota.remaining || 0
+    // 3GB = 3 * 1024 * 1024 * 1024 bytes
+    const threeGB = 3 * 1024 * 1024 * 1024
+    return remaining < threeGB
+  } catch (err) {
+    console.warn('Failed to check storage quota:', err)
+    return false
+  }
+})
 
 // スクロール制御関数
 const disableScroll = () => {
@@ -391,6 +422,18 @@ onUnmounted(() => {
 
 .signout-icon {
   color: #f44336;
+}
+
+.deletion-icon {
+  color: #666;
+}
+
+.menu-item.low-storage .menu-text {
+  color: #dc3545;
+}
+
+.menu-item.low-storage .deletion-icon {
+  color: #dc3545;
 }
 
 /* アニメーション */

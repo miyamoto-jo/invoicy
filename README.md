@@ -29,9 +29,11 @@ Invoicyは、Google Driveをデータストレージとして使用するクラ�
 ### 1. リポジトリのクローン
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/<your-username>/invoicy.git
 cd invoicy
 ```
+
+> **注意**: `<your-username>` を実際のGitHubユーザー名または組織名に置き換えてください。
 
 ### 2. 依存関係のインストール
 
@@ -50,9 +52,8 @@ npm install
    - **承認済みのJavaScriptオリジン**:
      - `http://localhost:3000` (開発用)
      - `https://<your-username>.github.io` (本番用)
-   - **承認済みのリダイレクトURI**:
-     - `http://localhost:3000/invoicy/` (開発用)
-     - `https://<your-username>.github.io/invoicy/` (本番用)
+   
+   > **注意**: Google Identity Servicesを使用しているため、リダイレクトURIの設定は不要です。JavaScriptオリジンのみ設定してください。
 
 ### 4. 環境変数の設定
 
@@ -73,7 +74,9 @@ VITE_APP_FOLDER_NAME=Invoicy
 npm run dev
 ```
 
-ブラウザで `http://localhost:3000` にアクセスしてアプリケーションを確認できます。
+ブラウザで `http://localhost:3000/invoicy/` にアクセスしてアプリケーションを確認できます。
+
+> **注意**: Viteの設定で `base: '/invoicy/'` が設定されているため、開発サーバーでも `/invoicy/` パスでアクセスする必要があります。
 
 ## 認証フロー
 
@@ -100,10 +103,25 @@ npm run build
 
 ### GitHub Pagesへのデプロイ
 
-1. GitHubリポジトリを作成
+1. GitHubリポジトリを作成（既に作成済みの場合はスキップ）
 2. GitHub Pagesを有効化（Settings > Pages）
 3. ソースを「GitHub Actions」に設定
-4. コードをプッシュすると自動的にデプロイされます
+4. GitHub Secretsに以下を設定（Settings > Secrets and variables > Actions）:
+   - `VITE_GOOGLE_CLIENT_ID`: Google Cloud Consoleで取得したクライアントID
+   - `VITE_APP_FOLDER_NAME`: アプリケーションフォルダ名（デフォルト: `Invoicy`）
+5. **ブランチ保護ルールを設定**（Settings > Branches > Add rule）:
+   - Branch name pattern: `main`
+   - ✅ Require a pull request before merging
+   - ✅ Require approvals: **1**（コードオーナーの承認が必須）
+   - ✅ Dismiss stale pull request approvals when new commits are pushed
+   - ✅ Require review from Code Owners（コードオーナーの承認を必須にする）
+   - ✅ Require status checks to pass before merging
+   - ✅ Require branches to be up to date before merging
+   - ✅ Do not allow bypassing the above settings
+   
+   > **注意**: `.github/CODEOWNERS` ファイルでコードオーナー（`@miyamoto-jo`）が設定されています。mainブランチへのプルリクエストには、コードオーナーの承認が必要です。
+6. `main` ブランチへの変更はプルリクエスト経由で行い、マージされると自動的にデプロイされます
+7. デプロイ後、`https://<your-username>.github.io/invoicy/` でアクセスできます
 
 ## 開発ガイド
 

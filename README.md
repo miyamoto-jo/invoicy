@@ -8,12 +8,60 @@ Invoicyは、Google Driveをデータストレージとして使用するクラ�
 
 ## 機能
 
-- ✅ Googleアカウント認証
+### 認証・設定
+- ✅ Googleアカウント認証（OAuth 2.0 + PKCE）
+- ✅ 事業者設定（事業者名、事業者番号、代表者名、振込先情報、連絡先、住所）
+
+### マスター管理
 - ✅ 顧客管理
+  - 顧客の登録・更新・削除・一覧表示
+  - 顧客ごとの締め日・支払い方法設定
 - ✅ 商品管理
+  - 商品の登録・更新・削除・一覧表示
+  - 顧客別の商品設定
 - ✅ 税率管理
-- ✅ 売上管理
+  - 税率の登録・更新・削除・一覧表示
+  - デフォルト税率の設定
+  - 端数計算方式の設定（切り捨て・切り上げ・四捨五入）
+
+### 売上管理
+- ✅ 売上伝票の作成
+  - 顧客・商品・数量の登録
+  - 税率の設定
+  - 備考欄の入力
+- ✅ 売上閲覧
+  - 期間指定での売上一覧表示
+  - 顧客・商品でのフィルタリング
+  - 売上詳細の表示
+  - 売上件数・合計金額・平均単価の表示
+- ✅ 売上分析
+  - 年間売上分析（月別グラフ表示）
+  - 月間売上分析（日別グラフ表示）
+  - 支払い別売上（現金・振込）
+  - 顧客別売上テーブル
+  - 商品別ランキング
+- ✅ 売上伝票の取り消し
+
+### 請求書管理
 - ✅ 請求書作成
+  - 月次請求書の自動作成（顧客の締め日に基づく期間計算）
+  - 複数顧客の一括選択
+  - 請求書の上書き保存
+- ✅ 請求書閲覧
+  - 請求書一覧表示
+  - 顧客名・期間でのフィルタリング
+  - 請求書詳細の表示
+- ✅ 請求書のPDF出力
+  - 個別・一括でのPDF出力
+  - ブラウザからのダウンロード
+- ✅ 請求書の削除
+
+### データ管理
+- ✅ データ削除機能
+  - 売上データの削除
+  - 請求書データの削除
+  - Google Drive容量の確認
+  - 容量不足時のアラート表示（3GB未満）
 
 ## 技術スタック
 
@@ -103,25 +151,7 @@ npm run build
 
 ### GitHub Pagesへのデプロイ
 
-1. GitHubリポジトリを作成（既に作成済みの場合はスキップ）
-2. GitHub Pagesを有効化（Settings > Pages）
-3. ソースを「GitHub Actions」に設定
-4. GitHub Secretsに以下を設定（Settings > Secrets and variables > Actions）:
-   - `VITE_GOOGLE_CLIENT_ID`: Google Cloud Consoleで取得したクライアントID
-   - `VITE_APP_FOLDER_NAME`: アプリケーションフォルダ名（デフォルト: `Invoicy`）
-5. **ブランチ保護ルールを設定**（Settings > Branches > Add rule）:
-   - Branch name pattern: `main`
-   - ✅ Require a pull request before merging
-   - ✅ Require approvals: **1**（コードオーナーの承認が必須）
-   - ✅ Dismiss stale pull request approvals when new commits are pushed
-   - ✅ Require review from Code Owners（コードオーナーの承認を必須にする）
-   - ✅ Require status checks to pass before merging
-   - ✅ Require branches to be up to date before merging
-   - ✅ Do not allow bypassing the above settings
-   
-   > **注意**: `.github/CODEOWNERS` ファイルでコードオーナー（`@miyamoto-jo`）が設定されています。mainブランチへのプルリクエストには、コードオーナーの承認が必要です。
-6. `main` ブランチへの変更はプルリクエスト経由で行い、マージされると自動的にデプロイされます
-7. デプロイ後、`https://<your-username>.github.io/invoicy/` でアクセスできます
+**デプロイ**: `main` ブランチにマージすると、GitHub Actionsが自動的にビルドとデプロイを実行します
 
 ## 開発ガイド
 

@@ -626,29 +626,14 @@ onMounted(() => {
   margin-top: 0.5rem;
 }
 
+/* コンポーネント固有のスタイル */
 .form {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group label {
-  font-weight: 500;
-  color: #333;
-  font-size: 0.9rem;
-}
-
 .form-group select {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.9rem;
   background: white;
 }
 
@@ -1011,53 +996,9 @@ onMounted(() => {
   gap: 0.5rem;
 }
 
+/* コンポーネント固有のスタイル */
 .form-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
   padding-top: 1rem;
-  border-top: 1px solid #e0e0e0;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.btn-primary:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #545b62;
-}
-
-.btn-secondary:disabled {
-  background: #adb5bd;
-  cursor: not-allowed;
 }
 
 /* レスポンシブ */

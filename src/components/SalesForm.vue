@@ -612,8 +612,9 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
 </script>
 
 <style scoped>
+/* コンポーネント固有のスタイル */
 .sales-form {
-  max-width: 800px;
+  max-width: var(--form-max-width-large);
   margin: 0 auto;
 }
 
@@ -622,55 +623,6 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-.form-label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: #333;
-}
-
-.form-input,
-.form-select,
-.form-textarea {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  transition: border-color 0.2s;
-}
-
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.form-input.error,
-.form-select.error {
-  border-color: #dc3545;
-}
-
-.form-input:disabled,
-.form-select:disabled {
-  background-color: #f8f9fa;
-  color: #6c757d;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.error-message {
-  color: #dc3545;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
 }
 
 .customer-notice {
@@ -877,14 +829,9 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   border: 1px solid #f5c6cb;
 }
 
+/* コンポーネント固有のスタイル */
 .form-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
   align-items: center;
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e0e0e0;
 }
 
 .sales-reflect-section {
@@ -894,46 +841,9 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
 }
 
 .sales-count {
-  color: #666;
+  color: var(--text-color-secondary);
   font-size: 0.875rem;
   font-weight: 500;
-}
-
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #545b62;
 }
 
 /* モーダルダイアログ */
@@ -998,10 +908,6 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   
   .form-actions {
     flex-direction: column;
-  }
-  
-  .btn {
-    width: 100%;
   }
   
   .modal-actions {

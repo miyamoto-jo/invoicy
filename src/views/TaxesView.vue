@@ -288,8 +288,8 @@ const closeForm = () => {
 .modal-content {
   background: white;
   border-radius: 8px;
-  max-width: 500px;
-  width: 100%;
+  width: 90%;
+  max-width: 400px;
   max-height: 90vh;
   overflow-y: auto;
 }

@@ -112,13 +112,11 @@ const handleSubmit = () => {
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-width: var(--form-max-width-small);
   width: 100%;
 }
 
 @media (max-width: 768px) {
   .tax-form {
-    margin: 1rem;
     padding: 1rem;
   }
 }

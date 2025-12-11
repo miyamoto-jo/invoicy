@@ -609,7 +609,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
   
   // アプリフォルダIDの取得（ローカルストレージから取得し、必要に応じて検証）
-  const getAppFolderId = async () => {
+  const getAppFolderId = async (retryCount = 0) => {
     const token = getAccessToken()
     if (!token) {
       throw new Error('認証トークンがありません')
@@ -619,6 +619,17 @@ export const useAuthStore = defineStore('auth', () => {
     const savedFolderId = localStorage.getItem(STORAGE_KEYS.APP_FOLDER_ID)
     
     if (!savedFolderId) {
+      // フォルダIDが保存されていない場合、1回だけ再作成を試みる
+      if (retryCount === 0) {
+        console.log('⚠️ App folder ID not found, attempting to recreate...')
+        try {
+          const appFolder = await ensureAppFolder(token)
+          return appFolder
+        } catch (ensureErr) {
+          console.error('Failed to ensure app folder:', ensureErr)
+          throw new Error('アプリフォルダIDが保存されていません。ログインしてください。')
+        }
+      }
       throw new Error('アプリフォルダIDが保存されていません。ログインしてください。')
     }
     
@@ -635,22 +646,52 @@ export const useAuthStore = defineStore('auth', () => {
         } else {
           console.log('⚠️ Saved folder is trashed or has wrong name')
           localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
+          // 1回だけ再作成を試みる
+          if (retryCount === 0) {
+            try {
+              const appFolder = await ensureAppFolder(token)
+              return appFolder
+            } catch (ensureErr) {
+              console.error('Failed to ensure app folder:', ensureErr)
+              throw new Error('保存されたフォルダが無効です。ログインしてください。')
+            }
+          }
           throw new Error('保存されたフォルダが無効です。ログインしてください。')
         }
       } else {
         console.log('⚠️ Saved folder ID is invalid')
         localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
+        // 1回だけ再作成を試みる
+        if (retryCount === 0) {
+          try {
+            const appFolder = await ensureAppFolder(token)
+            return appFolder
+          } catch (ensureErr) {
+            console.error('Failed to ensure app folder:', ensureErr)
+            throw new Error('保存されたフォルダが見つかりません。ログインしてください。')
+          }
+        }
         throw new Error('保存されたフォルダが見つかりません。ログインしてください。')
       }
     } catch (err) {
       console.error('Failed to verify folder ID:', err)
       localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
+      // 1回だけ再作成を試みる
+      if (retryCount === 0) {
+        try {
+          const appFolder = await ensureAppFolder(token)
+          return appFolder
+        } catch (ensureErr) {
+          console.error('Failed to ensure app folder:', ensureErr)
+          throw new Error('フォルダの検証に失敗しました。ログインしてください。')
+        }
+      }
       throw new Error('フォルダの検証に失敗しました。ログインしてください。')
     }
   }
   
   // サブフォルダIDの取得（ローカルストレージから取得し、必要に応じて検証）
-  const getSubFolderId = async (folderName) => {
+  const getSubFolderId = async (folderName, retryCount = 0) => {
     const token = getAccessToken()
     if (!token) {
       throw new Error('認証トークンがありません')
@@ -673,6 +714,22 @@ export const useAuthStore = defineStore('auth', () => {
     
     if (!savedFolderId) {
       console.log(`❌ ${folderName} folder ID not found in localStorage`)
+      // 1回だけ再作成を試みる
+      if (retryCount === 0) {
+        try {
+          // ensureAppFolderを直接呼び出す（getAppFolderIdを経由しない）
+          const appFolder = await ensureAppFolder(token)
+          // サブフォルダを確保
+          await ensureSubFolders(token, appFolder.id)
+          // 再取得を試みる
+          const recreatedFolderId = localStorage.getItem(storageKey)
+          if (recreatedFolderId) {
+            return { id: recreatedFolderId }
+          }
+        } catch (ensureErr) {
+          console.error(`Failed to ensure ${folderName} folder:`, ensureErr)
+        }
+      }
       throw new Error(`${folderName}フォルダIDが保存されていません。ログインしてください。`)
     }
     
@@ -697,6 +754,22 @@ export const useAuthStore = defineStore('auth', () => {
           console.log(`📄 Expected name: ${folderName}, actual name: ${folderInfo.name}`)
           console.log(`📄 Trashed: ${folderInfo.trashed}`)
           localStorage.removeItem(getSubFolderStorageKey(folderName))
+          // 1回だけ再作成を試みる
+          if (retryCount === 0) {
+            try {
+              // ensureAppFolderを直接呼び出す（getAppFolderIdを経由しない）
+              const appFolder = await ensureAppFolder(token)
+              // サブフォルダを確保
+              await ensureSubFolders(token, appFolder.id)
+              // 再取得を試みる
+              const recreatedFolderId = localStorage.getItem(storageKey)
+              if (recreatedFolderId) {
+                return { id: recreatedFolderId }
+              }
+            } catch (ensureErr) {
+              console.error(`Failed to ensure ${folderName} folder:`, ensureErr)
+            }
+          }
           throw new Error(`保存された${folderName}フォルダが無効です。ログインしてください。`)
         }
       } else {
@@ -704,11 +777,43 @@ export const useAuthStore = defineStore('auth', () => {
         const errorText = await verifyResponse.text()
         console.log(`📄 Error response:`, errorText)
         localStorage.removeItem(getSubFolderStorageKey(folderName))
+        // 1回だけ再作成を試みる
+        if (retryCount === 0) {
+          try {
+            // ensureAppFolderを直接呼び出す（getAppFolderIdを経由しない）
+            const appFolder = await ensureAppFolder(token)
+            // サブフォルダを確保
+            await ensureSubFolders(token, appFolder.id)
+            // 再取得を試みる
+            const recreatedFolderId = localStorage.getItem(storageKey)
+            if (recreatedFolderId) {
+              return { id: recreatedFolderId }
+            }
+          } catch (ensureErr) {
+            console.error(`Failed to ensure ${folderName} folder:`, ensureErr)
+          }
+        }
         throw new Error(`保存された${folderName}フォルダが見つかりません。ログインしてください。`)
       }
     } catch (err) {
       console.error(`Failed to verify ${folderName} folder ID:`, err)
       localStorage.removeItem(getSubFolderStorageKey(folderName))
+      // 1回だけ再作成を試みる
+      if (retryCount === 0) {
+        try {
+          // ensureAppFolderを直接呼び出す（getAppFolderIdを経由しない）
+          const appFolder = await ensureAppFolder(token)
+          // サブフォルダを確保
+          await ensureSubFolders(token, appFolder.id)
+          // 再取得を試みる
+          const recreatedFolderId = localStorage.getItem(storageKey)
+          if (recreatedFolderId) {
+            return { id: recreatedFolderId }
+          }
+        } catch (ensureErr) {
+          console.error(`Failed to ensure ${folderName} folder:`, ensureErr)
+        }
+      }
       throw new Error(`${folderName}フォルダの検証に失敗しました。ログインしてください。`)
     }
   }

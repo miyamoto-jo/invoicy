@@ -41,12 +41,27 @@
         <button @click="hideToast" class="toast-close">&times;</button>
       </div>
     </div>
+
+    <!-- 画面遷移確認ダイアログ -->
+    <div v-if="showNavigationDialog" class="modal-overlay" @click="cancelNavigation">
+      <div class="modal-content" @click.stop>
+        <h3>確認</h3>
+        <p>
+          反映されていない売上があります。本当に画面移動しますか？<br>
+          入力した内容とローカルメモリの売上情報は消えますが大丈夫ですか？
+        </p>
+        <div class="modal-actions">
+          <button @click="confirmNavigation" class="btn btn-primary">はい</button>
+          <button @click="cancelNavigation" class="btn btn-secondary">いいえ</button>
+        </div>
+      </div>
+    </div>
   </AppLayout>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import SalesForm from '../components/SalesForm.vue'
 import AppLayout from '../components/AppLayout.vue'
 
@@ -60,6 +75,8 @@ const toast = ref({
   message: '',
   type: 'success' // 'success' or 'error'
 })
+const showNavigationDialog = ref(false)
+const pendingNavigation = ref(null)
 
 // Methods
 const handleSaleCreated = (sale) => {
@@ -106,6 +123,31 @@ const showToast = (message, type = 'success') => {
 
 const hideToast = () => {
   toast.value.show = false
+}
+
+// 画面遷移時の確認処理
+onBeforeRouteLeave((to, from, next) => {
+  // 未反映の売上がある場合は確認ダイアログを表示
+  if (salesFormRef.value && salesFormRef.value.hasUnreflectedSales) {
+    showNavigationDialog.value = true
+    pendingNavigation.value = next
+    next(false) // 遷移を一時停止
+  } else {
+    next() // 遷移を許可
+  }
+})
+
+const confirmNavigation = () => {
+  showNavigationDialog.value = false
+  if (pendingNavigation.value) {
+    pendingNavigation.value()
+    pendingNavigation.value = null
+  }
+}
+
+const cancelNavigation = () => {
+  showNavigationDialog.value = false
+  pendingNavigation.value = null
 }
 </script>
 
@@ -276,6 +318,46 @@ const hideToast = () => {
   background: #218838;
 }
 
+/* モーダルダイアログ */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+}
+
+.modal-content h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+}
+
+.modal-content p {
+  margin: 0 0 1.5rem 0;
+  color: #666;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
 @media (max-width: 768px) {
   .success-actions {
     flex-direction: column;
@@ -289,6 +371,10 @@ const hideToast = () => {
     left: 20px;
     right: 20px;
     min-width: auto;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
   }
 }
 </style> 

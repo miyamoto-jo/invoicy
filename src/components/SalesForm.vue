@@ -157,24 +157,23 @@
           売上書込み
         </button>
         
-        <!-- 売上反映ボタン -->
-        <div v-if="localSales.length > 0" class="sales-reflect-section">
-          <button 
-            type="button" 
-            @click="handleReflectSales" 
-            class="btn btn-success"
-          >
-            売上反映
-          </button>
-          <span class="sales-count">({{ localSales.length }}件)</span>
-        </div>
-        
         <button 
           type="button" 
           @click="handleCancel" 
           class="btn btn-secondary"
         >
           キャンセル
+        </button>
+      </div>
+      
+      <!-- 売上反映ボタン -->
+      <div v-if="localSales.length > 0" class="sales-reflect-section">
+        <button 
+          type="button" 
+          @click="handleReflectSales" 
+          class="btn btn-danger"
+        >
+          売上反映（{{ localSales.length }}件）
         </button>
       </div>
     </form>
@@ -184,7 +183,7 @@
       <div class="modal-content" @click.stop>
         <h3>確認</h3>
         <p v-if="localSales.length > 0">
-          ダッシュボードに戻りますか？<br>
+          反映されていない売上があります。本当に画面移動しますか？<br>
           入力した内容とローカルメモリの売上情報は消えますが大丈夫ですか？
         </p>
         <p v-else>
@@ -520,8 +519,10 @@ const showToast = (message, type = 'success') => {
 }
 
 const handleCancel = () => {
-  // ローカルメモリに売上情報がある場合、または商品が選択されている場合に確認ダイアログを表示
-  if (localSales.value.length > 0 || selectedProducts.value.length > 0 || formData.value.note) {
+  // ローカルメモリに売上情報がある場合は必ず確認ダイアログを表示
+  if (localSales.value.length > 0) {
+    showCancelDialog.value = true
+  } else if (selectedProducts.value.length > 0 || formData.value.note) {
     showCancelDialog.value = true
   } else {
     emit('cancel')
@@ -581,10 +582,15 @@ onMounted(async () => {
   }
 })
 
+// 未反映の売上があるかどうかを判定するcomputed
+const hasUnreflectedSales = computed(() => localSales.value.length > 0)
+
 // 外部から呼び出せるメソッドを定義
 defineExpose({
   clearForm,
-  clearLocalSales
+  clearLocalSales,
+  localSales,
+  hasUnreflectedSales
 })
 
 // Watch for customer changes to reset selected products
@@ -836,14 +842,18 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
 
 .sales-reflect-section {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
-.sales-count {
-  color: var(--text-color-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
 }
 
 /* モーダルダイアログ */

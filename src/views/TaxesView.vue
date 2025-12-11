@@ -4,7 +4,7 @@
       <div class="content-wrapper">
         <!-- 税率設定 -->
         <div class="content-section">
-          <h2>税率設定</h2>
+          <h2 class="centered-title">税率設定</h2>
           <div class="settings-form">
             <div class="form-group">
               <label for="rounding">端数計算方式</label>
@@ -37,7 +37,7 @@
                   :key="tax.id" 
                   :value="tax.id"
                 >
-                  {{ tax.rate }}% {{ tax.description ? `(${tax.description})` : '' }}
+                  {{ tax.rate }}%
                 </option>
               </select>
             </div>
@@ -201,6 +201,10 @@ const closeForm = () => {
   margin-bottom: 1.5rem;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid #e0e0e0;
+}
+
+.content-section h2.centered-title {
+  text-align: center;
 }
 
 .settings-form {

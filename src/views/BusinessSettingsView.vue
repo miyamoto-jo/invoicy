@@ -378,5 +378,19 @@ const handleSignOut = async () => {
     margin: 0 1rem;
     padding: 1.5rem;
   }
+  
+  .form-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .form-header h2 {
+    text-align: center;
+  }
+  
+  .form-header p {
+    text-align: center;
+  }
 }
 </style> 

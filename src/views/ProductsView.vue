@@ -23,13 +23,6 @@
     <div class="products-content">
         <!-- 商品一覧 -->
         <div v-if="!showForm && !showBulkCreate" class="card">
-          <div class="card-header">
-            <h2>商品一覧</h2>
-            <div class="card-stats">
-              <span class="stat">登録商品: {{ productsCount }}件</span>
-            </div>
-          </div>
-          
           <ProductList
             :products="products"
             :is-loading="isLoading"
@@ -86,6 +79,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useProductsStore } from '../stores/products'
+import { useCustomersStore } from '../stores/customers'
 import { useLoading } from '../composables/useLoading'
 import ProductList from '../components/ProductList.vue'
 import ProductForm from '../components/ProductForm.vue'
@@ -93,6 +87,7 @@ import ProductBulkCreate from '../components/ProductBulkCreate.vue'
 import AppLayout from '../components/AppLayout.vue'
 
 const productsStore = useProductsStore()
+const customersStore = useCustomersStore()
 const { setLoading, clearLoading } = useLoading()
 
 // ローカル状態
@@ -112,8 +107,16 @@ const isEdit = computed(() => !!editingProduct.value)
 // 初期化
 onMounted(async () => {
   try {
-    setLoading(true, '商品データを読み込み中...', '商品情報を取得しています')
-    await productsStore.initializeProducts()
+    setLoading(true, 'データを読み込み中...', '商品情報と顧客情報を取得しています')
+    
+    // 商品データと顧客データを並列で読み込む
+    await Promise.all([
+      productsStore.initializeProducts(),
+      // 顧客データも事前に読み込んでおく（ProductFormで使用するため）
+      customersStore.customers.length === 0 
+        ? customersStore.initializeCustomers() 
+        : Promise.resolve()
+    ])
   } catch (err) {
     console.error('Failed to initialize products:', err)
   } finally {
@@ -217,6 +220,7 @@ const handleDelete = async (productId) => {
   font-size: 1.5rem;
   font-weight: 600;
   margin: 0;
+  text-align: center;
 }
 
 .products-content {
@@ -292,6 +296,22 @@ const handleDelete = async (productId) => {
 
 .btn-secondary:hover:not(:disabled) {
   background-color: #545b62;
+}
+
+.btn-outline {
+  background-color: #ffe0e0;
+  color: #c82333;
+  border: 1px solid #f5c6cb;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: #ffcccc;
+  border-color: #f5c6cb;
+}
+
+.btn-outline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* レスポンシブ */

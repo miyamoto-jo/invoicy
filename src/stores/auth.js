@@ -307,7 +307,9 @@ export const useAuthStore = defineStore('auth', () => {
       // アプリフォルダの確認・作成
       try {
         console.log('📁 Ensuring app folder...')
-        await ensureAppFolder(access_token)
+        await executeWithTokenRefresh(async (token) => {
+          return await ensureAppFolder(token)
+        })
         console.log('✅ App folder ensured')
       } catch (folderError) {
         console.error('❌ App folder creation failed:', {
@@ -409,6 +411,206 @@ export const useAuthStore = defineStore('auth', () => {
     return sessionStorage.getItem('google_access_token')
   }
   
+  // トークンの有効期限情報を取得
+  const getTokenExpirationInfo = async () => {
+    try {
+      const token = getAccessToken()
+      if (!token) {
+        return {
+          hasToken: false,
+          message: 'トークンがありません'
+        }
+      }
+      
+      const url = googleApiClient.getTokenInfoUrl(token)
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        return {
+          hasToken: true,
+          isValid: false,
+          message: 'トークンが無効です',
+          error: await response.text()
+        }
+      }
+      
+      const tokenInfo = await response.json()
+      
+      // expires_in（秒）が含まれている場合
+      if (tokenInfo.expires_in) {
+        const expiresInSeconds = parseInt(tokenInfo.expires_in)
+        const expiresAt = new Date(Date.now() + expiresInSeconds * 1000)
+        const now = new Date()
+        const remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000))
+        const remainingMinutes = Math.floor(remainingSeconds / 60)
+        const remainingHours = Math.floor(remainingMinutes / 60)
+        
+        return {
+          hasToken: true,
+          isValid: true,
+          expiresIn: expiresInSeconds,
+          expiresAt: expiresAt,
+          remainingSeconds: remainingSeconds,
+          remainingMinutes: remainingMinutes,
+          remainingHours: remainingHours,
+          expiresInFormatted: formatExpirationTime(remainingSeconds),
+          expiresAtFormatted: expiresAt.toLocaleString('ja-JP'),
+          tokenInfo: tokenInfo
+        }
+      }
+      
+      // expires_inがない場合（通常は含まれるはず）
+      return {
+        hasToken: true,
+        isValid: true,
+        message: '有効期限情報が取得できませんでした',
+        tokenInfo: tokenInfo
+      }
+      
+    } catch (err) {
+      console.error('Token expiration info error:', err)
+      return {
+        hasToken: true,
+        isValid: false,
+        error: err.message
+      }
+    }
+  }
+  
+  // 有効期限をフォーマットするヘルパー関数
+  const formatExpirationTime = (seconds) => {
+    if (seconds < 60) {
+      return `${seconds}秒`
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60)
+      const secs = seconds % 60
+      return `${minutes}分${secs}秒`
+    } else {
+      const hours = Math.floor(seconds / 3600)
+      const minutes = Math.floor((seconds % 3600) / 60)
+      return `${hours}時間${minutes}分`
+    }
+  }
+  
+  // 401エラーかどうかを判定するヘルパー関数
+  const isTokenExpiredError = (error) => {
+    if (!error) return false
+    const errorMessage = error.message || error.toString()
+    return errorMessage.includes('401') || 
+           errorMessage.includes('UNAUTHENTICATED') ||
+           errorMessage.includes('Invalid Credentials') ||
+           errorMessage.includes('invalid authentication credentials')
+  }
+  
+  // トークンをリフレッシュする関数
+  const refreshAccessToken = () => {
+    return new Promise((resolve, reject) => {
+      if (!tokenClient) {
+        reject(new Error('Google Identity Servicesが初期化されていません'))
+        return
+      }
+      
+      console.log('🔄 Refreshing access token...')
+      
+      // コールバックを一時的に保存
+      const originalCallback = tokenClient.callback
+      let callbackResolved = false
+      
+      // 一時的なコールバックを設定
+      tokenClient.callback = async (response) => {
+        // 既に解決済みの場合は無視（元のコールバックが呼ばれた場合）
+        if (callbackResolved) {
+          return
+        }
+        
+        try {
+          if (response.error) {
+            console.error('❌ Token refresh failed:', response.error)
+            callbackResolved = true
+            // 元のコールバックを復元
+            tokenClient.callback = originalCallback
+            reject(new Error(`トークンのリフレッシュに失敗しました: ${response.error}`))
+            return
+          }
+          
+          const { access_token } = response
+          if (access_token) {
+            console.log('✅ Token refreshed successfully')
+            sessionStorage.setItem('google_access_token', access_token)
+            callbackResolved = true
+            // 元のコールバックを復元
+            tokenClient.callback = originalCallback
+            resolve(access_token)
+          } else {
+            callbackResolved = true
+            // 元のコールバックを復元
+            tokenClient.callback = originalCallback
+            reject(new Error('トークンが取得できませんでした'))
+          }
+        } catch (err) {
+          console.error('❌ Token refresh callback error:', err)
+          callbackResolved = true
+          // 元のコールバックを復元
+          tokenClient.callback = originalCallback
+          reject(err)
+        }
+      }
+      
+      // タイムアウト設定（10秒）
+      const timeout = setTimeout(() => {
+        if (!callbackResolved) {
+          callbackResolved = true
+          tokenClient.callback = originalCallback
+          reject(new Error('トークンのリフレッシュがタイムアウトしました'))
+        }
+      }, 10000)
+      
+      // トークンをリクエスト
+      try {
+        tokenClient.requestAccessToken({ prompt: '' })
+      } catch (err) {
+        clearTimeout(timeout)
+        callbackResolved = true
+        tokenClient.callback = originalCallback
+        reject(err)
+      }
+    })
+  }
+  
+  // トークンを使用してAPIリクエストを実行し、401エラーの場合は自動的にリフレッシュして再試行
+  const executeWithTokenRefresh = async (apiCall, retryCount = 0) => {
+    const maxRetries = 1 // 最大1回までリトライ
+    
+    try {
+      const token = getAccessToken()
+      if (!token) {
+        throw new Error('認証トークンがありません。ログインしてください。')
+      }
+      
+      return await apiCall(token)
+    } catch (err) {
+      // 401エラーで、まだリトライしていない場合
+      if (isTokenExpiredError(err) && retryCount < maxRetries) {
+        console.log(`⚠️ Token expired (attempt ${retryCount + 1}), refreshing...`)
+        
+        try {
+          // トークンをリフレッシュ
+          const newToken = await refreshAccessToken()
+          console.log('✅ Token refreshed, retrying API call...')
+          
+          // 新しいトークンで再試行
+          return await executeWithTokenRefresh(apiCall, retryCount + 1)
+        } catch (refreshErr) {
+          console.error('❌ Token refresh failed:', refreshErr)
+          throw new Error('トークンのリフレッシュに失敗しました。再度ログインしてください。')
+        }
+      }
+      
+      // 401エラーだがリトライ回数を超えた場合、または401以外のエラーの場合
+      throw err
+    }
+  }
+  
   // アプリフォルダの確認・作成
   const ensureAppFolder = async (token) => {
     // 既にフォルダ作成処理中の場合は待機
@@ -433,10 +635,12 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('📋 App folder name:', APP_FOLDER_NAME)
       console.log('🔑 Token available:', !!token)
       
-      // まず既存のフォルダを検索
+      // まず既存のフォルダを検索（401エラー時は自動リフレッシュ）
       console.log('🔍 Searching for existing app folder...')
       const searchQuery = `name='${APP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
-      const searchResult = await googleApiClient.searchFiles(token, searchQuery, 'files(id,name)')
+      const searchResult = await executeWithTokenRefresh(async (currentToken) => {
+        return await googleApiClient.searchFiles(currentToken, searchQuery, 'files(id,name)')
+      })
       console.log('📄 Search result:', searchResult)
       
       if (searchResult.files && searchResult.files.length > 0) {
@@ -451,8 +655,10 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.setItem(STORAGE_KEYS.APP_FOLDER_ID, existingFolder.id)
         console.log('💾 Existing folder ID saved to localStorage')
         
-        // サブフォルダの確認・作成
-        await ensureSubFolders(token, existingFolder.id)
+        // サブフォルダの確認・作成（401エラー時は自動リフレッシュ）
+        await executeWithTokenRefresh(async (currentToken) => {
+          return await ensureSubFolders(currentToken, existingFolder.id)
+        })
         
         // フォルダ作成処理完了
         isCreatingAppFolder.value = false
@@ -465,17 +671,27 @@ export const useAuthStore = defineStore('auth', () => {
       if (savedFolderId) {
         console.log('🔍 Verifying saved folder ID:', savedFolderId)
         
-        // 保存されたフォルダIDの存在確認
-        const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
-        const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
-        
-        if (verifyResponse.ok) {
-          const folderInfo = await verifyResponse.json()
+        // 保存されたフォルダIDの存在確認（401エラー時は自動リフレッシュ）
+        try {
+          const folderInfo = await executeWithTokenRefresh(async (currentToken) => {
+            const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+            const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, currentToken)
+            
+            if (!verifyResponse.ok) {
+              const errorText = await verifyResponse.text()
+              throw new Error(`API request failed: ${verifyResponse.status} ${verifyResponse.statusText} - ${errorText}`)
+            }
+            
+            return await verifyResponse.json()
+          })
+          
           if (!folderInfo.trashed && folderInfo.name === APP_FOLDER_NAME) {
             console.log('✅ Saved folder ID is valid:', savedFolderId)
             
-            // サブフォルダの確認・作成
-            await ensureSubFolders(token, savedFolderId)
+            // サブフォルダの確認・作成（401エラー時は自動リフレッシュ）
+            await executeWithTokenRefresh(async (currentToken) => {
+              return await ensureSubFolders(currentToken, savedFolderId)
+            })
             
             // フォルダ作成処理完了
             isCreatingAppFolder.value = false
@@ -484,15 +700,21 @@ export const useAuthStore = defineStore('auth', () => {
             console.log('⚠️ Saved folder is trashed or has wrong name, removing from localStorage')
             localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
           }
-        } else {
-          console.log('⚠️ Saved folder ID is invalid, removing from localStorage')
-          localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
+        } catch (verifyErr) {
+          // 401エラー以外の場合はローカルストレージから削除
+          if (!isTokenExpiredError(verifyErr)) {
+            console.log('⚠️ Saved folder ID is invalid, removing from localStorage')
+            localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
+          }
+          throw verifyErr
         }
       }
       
-      // フォルダIDがない場合または無効な場合は新規作成
+      // フォルダIDがない場合または無効な場合は新規作成（401エラー時は自動リフレッシュ）
       console.log('📁 Creating new app folder...')
-      const newFolder = await googleApiClient.createFolder(token, APP_FOLDER_NAME)
+      const newFolder = await executeWithTokenRefresh(async (currentToken) => {
+        return await googleApiClient.createFolder(currentToken, APP_FOLDER_NAME)
+      })
       console.log('✅ App folder created:', newFolder.id)
       console.log('📄 Create response data:', newFolder)
       
@@ -500,8 +722,10 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem(STORAGE_KEYS.APP_FOLDER_ID, newFolder.id)
       console.log('💾 Folder ID saved to localStorage')
       
-      // サブフォルダの作成
-      await ensureSubFolders(token, newFolder.id)
+      // サブフォルダの作成（401エラー時は自動リフレッシュ）
+      await executeWithTokenRefresh(async (currentToken) => {
+        return await ensureSubFolders(currentToken, newFolder.id)
+      })
       
       return newFolder
       
@@ -546,8 +770,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       console.log(`🔍 Checking ${folderName} folder...`)
       
-      // 既存のフォルダを検索
-      const searchResult = await googleApiClient.searchFolder(token, folderName, parentFolderId)
+      // 既存のフォルダを検索（401エラー時は自動リフレッシュ）
+      const searchResult = await executeWithTokenRefresh(async (currentToken) => {
+        return await googleApiClient.searchFolder(currentToken, folderName, parentFolderId)
+      })
       console.log(`📄 ${folderName} folder search result:`, searchResult)
       
       if (searchResult.files && searchResult.files.length > 0) {
@@ -567,12 +793,20 @@ export const useAuthStore = defineStore('auth', () => {
       if (savedFolderId) {
         console.log(`🔍 Verifying saved ${folderName} folder ID:`, savedFolderId)
         
-        // 保存されたフォルダIDの存在確認
-        const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
-        const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
-        
-        if (verifyResponse.ok) {
-          const folderInfo = await verifyResponse.json()
+        // 保存されたフォルダIDの存在確認（401エラー時は自動リフレッシュ）
+        try {
+          const folderInfo = await executeWithTokenRefresh(async (currentToken) => {
+            const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+            const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, currentToken)
+            
+            if (!verifyResponse.ok) {
+              const errorText = await verifyResponse.text()
+              throw new Error(`API request failed: ${verifyResponse.status} ${verifyResponse.statusText} - ${errorText}`)
+            }
+            
+            return await verifyResponse.json()
+          })
+          
           if (!folderInfo.trashed && folderInfo.name === folderName) {
             console.log(`✅ Saved ${folderName} folder ID is valid:`, savedFolderId)
             return { id: savedFolderId }
@@ -580,15 +814,21 @@ export const useAuthStore = defineStore('auth', () => {
             console.log(`⚠️ Saved ${folderName} folder is trashed or has wrong name, removing from localStorage`)
             localStorage.removeItem(getSubFolderStorageKey(folderName))
           }
-        } else {
-          console.log(`⚠️ Saved ${folderName} folder ID is invalid, removing from localStorage`)
-          localStorage.removeItem(getSubFolderStorageKey(folderName))
+        } catch (verifyErr) {
+          // 401エラー以外の場合はローカルストレージから削除
+          if (!isTokenExpiredError(verifyErr)) {
+            console.log(`⚠️ Saved ${folderName} folder ID is invalid, removing from localStorage`)
+            localStorage.removeItem(getSubFolderStorageKey(folderName))
+          }
+          throw verifyErr
         }
       }
       
-      // フォルダがない場合は新規作成
+      // フォルダがない場合は新規作成（401エラー時は自動リフレッシュ）
       console.log(`📁 Creating new ${folderName} folder...`)
-      const newFolder = await googleApiClient.createFolder(token, folderName, parentFolderId)
+      const newFolder = await executeWithTokenRefresh(async (currentToken) => {
+        return await googleApiClient.createFolder(currentToken, folderName, parentFolderId)
+      })
       console.log(`✅ ${folderName} folder created:`, newFolder.id)
       console.log(`📄 ${folderName} folder create response data:`, newFolder)
       
@@ -609,53 +849,97 @@ export const useAuthStore = defineStore('auth', () => {
   }
   
   // アプリフォルダIDの取得（ローカルストレージから取得し、必要に応じて検証）
-  const getAppFolderId = async () => {
-    const token = getAccessToken()
-    if (!token) {
-      throw new Error('認証トークンがありません')
-    }
-    
+  const getAppFolderId = async (retryCount = 0) => {
     // ローカルストレージからフォルダIDを取得
     const savedFolderId = localStorage.getItem(STORAGE_KEYS.APP_FOLDER_ID)
     
     if (!savedFolderId) {
+      // フォルダIDが保存されていない場合、1回だけ再作成を試みる
+      if (retryCount === 0) {
+        console.log('⚠️ App folder ID not found, attempting to recreate...')
+        try {
+          const appFolder = await executeWithTokenRefresh(async (token) => {
+            return await ensureAppFolder(token)
+          })
+          return appFolder
+        } catch (ensureErr) {
+          console.error('Failed to ensure app folder:', ensureErr)
+          if (isTokenExpiredError(ensureErr)) {
+            throw new Error('認証が期限切れです。再度ログインしてください。')
+          }
+          throw new Error('アプリフォルダIDが保存されていません。ログインしてください。')
+        }
+      }
       throw new Error('アプリフォルダIDが保存されていません。ログインしてください。')
     }
     
     // フォルダIDの有効性を検証
     try {
-      const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
-      const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
-      
-      if (verifyResponse.ok) {
-        const folderInfo = await verifyResponse.json()
-        if (!folderInfo.trashed && folderInfo.name === APP_FOLDER_NAME) {
-          console.log('✅ Using saved folder ID:', savedFolderId)
-          return { id: savedFolderId }
-        } else {
-          console.log('⚠️ Saved folder is trashed or has wrong name')
-          localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
-          throw new Error('保存されたフォルダが無効です。ログインしてください。')
+      const folderInfo = await executeWithTokenRefresh(async (token) => {
+        const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+        const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
+        
+        if (!verifyResponse.ok) {
+          const errorText = await verifyResponse.text()
+          throw new Error(`API request failed: ${verifyResponse.status} ${verifyResponse.statusText} - ${errorText}`)
         }
+        
+        return await verifyResponse.json()
+      })
+      
+      if (!folderInfo.trashed && folderInfo.name === APP_FOLDER_NAME) {
+        console.log('✅ Using saved folder ID:', savedFolderId)
+        return { id: savedFolderId }
       } else {
-        console.log('⚠️ Saved folder ID is invalid')
+        console.log('⚠️ Saved folder is trashed or has wrong name')
         localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
-        throw new Error('保存されたフォルダが見つかりません。ログインしてください。')
+        // 1回だけ再作成を試みる
+        if (retryCount === 0) {
+          try {
+            const appFolder = await executeWithTokenRefresh(async (token) => {
+              return await ensureAppFolder(token)
+            })
+            return appFolder
+          } catch (ensureErr) {
+            console.error('Failed to ensure app folder:', ensureErr)
+            if (isTokenExpiredError(ensureErr)) {
+              throw new Error('認証が期限切れです。再度ログインしてください。')
+            }
+            throw new Error('保存されたフォルダが無効です。ログインしてください。')
+          }
+        }
+        throw new Error('保存されたフォルダが無効です。ログインしてください。')
       }
     } catch (err) {
       console.error('Failed to verify folder ID:', err)
+      
+      // 401エラーの場合は再作成を試みない（既にリフレッシュ済み）
+      if (isTokenExpiredError(err)) {
+        throw new Error('認証が期限切れです。再度ログインしてください。')
+      }
+      
       localStorage.removeItem(STORAGE_KEYS.APP_FOLDER_ID)
+      // 1回だけ再作成を試みる
+      if (retryCount === 0) {
+        try {
+          const appFolder = await executeWithTokenRefresh(async (token) => {
+            return await ensureAppFolder(token)
+          })
+          return appFolder
+        } catch (ensureErr) {
+          console.error('Failed to ensure app folder:', ensureErr)
+          if (isTokenExpiredError(ensureErr)) {
+            throw new Error('認証が期限切れです。再度ログインしてください。')
+          }
+          throw new Error('フォルダの検証に失敗しました。ログインしてください。')
+        }
+      }
       throw new Error('フォルダの検証に失敗しました。ログインしてください。')
     }
   }
   
   // サブフォルダIDの取得（ローカルストレージから取得し、必要に応じて検証）
-  const getSubFolderId = async (folderName) => {
-    const token = getAccessToken()
-    if (!token) {
-      throw new Error('認証トークンがありません')
-    }
-    
+  const getSubFolderId = async (folderName, retryCount = 0) => {
     // フォルダ名の検証
     if (!SUB_FOLDERS.includes(folderName)) {
       throw new Error(`無効なフォルダ名です: ${folderName}`)
@@ -673,44 +957,150 @@ export const useAuthStore = defineStore('auth', () => {
     
     if (!savedFolderId) {
       console.log(`❌ ${folderName} folder ID not found in localStorage`)
+      // 1回だけ再作成を試みる
+      if (retryCount === 0) {
+        try {
+          // ensureAppFolderを直接呼び出す（getAppFolderIdを経由しない）
+          const appFolder = await executeWithTokenRefresh(async (token) => {
+            return await ensureAppFolder(token)
+          })
+          // サブフォルダを確保
+          await executeWithTokenRefresh(async (token) => {
+            return await ensureSubFolders(token, appFolder.id)
+          })
+          // 再取得を試みる
+          const recreatedFolderId = localStorage.getItem(storageKey)
+          if (recreatedFolderId) {
+            return { id: recreatedFolderId }
+          }
+        } catch (ensureErr) {
+          console.error(`Failed to ensure ${folderName} folder:`, ensureErr)
+          if (isTokenExpiredError(ensureErr)) {
+            throw new Error('認証が期限切れです。再度ログインしてください。')
+          }
+        }
+      }
       throw new Error(`${folderName}フォルダIDが保存されていません。ログインしてください。`)
     }
     
     // フォルダIDの有効性を検証
     try {
       console.log(`🔍 Verifying ${folderName} folder ID: ${savedFolderId}`)
-      const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
-      console.log(`📡 Verification URL: ${url}`)
       
-      const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
-      console.log(`📡 Verification response status: ${verifyResponse.status}`)
-      
-      if (verifyResponse.ok) {
-        const folderInfo = await verifyResponse.json()
-        console.log(`📄 Folder info:`, folderInfo)
+      const folderInfo = await executeWithTokenRefresh(async (token) => {
+        const url = googleApiClient.getDriveFileUrl(savedFolderId, { fields: 'id,name,trashed' })
+        console.log(`📡 Verification URL: ${url}`)
         
-        if (!folderInfo.trashed && folderInfo.name === folderName) {
-          console.log(`✅ Using saved ${folderName} folder ID:`, savedFolderId)
-          return { id: savedFolderId }
-        } else {
-          console.log(`⚠️ Saved ${folderName} folder is trashed or has wrong name`)
-          console.log(`📄 Expected name: ${folderName}, actual name: ${folderInfo.name}`)
-          console.log(`📄 Trashed: ${folderInfo.trashed}`)
-          localStorage.removeItem(getSubFolderStorageKey(folderName))
-          throw new Error(`保存された${folderName}フォルダが無効です。ログインしてください。`)
+        const verifyResponse = await googleApiClient.makeAuthenticatedRequest(url, token)
+        console.log(`📡 Verification response status: ${verifyResponse.status}`)
+        
+        if (!verifyResponse.ok) {
+          const errorText = await verifyResponse.text()
+          throw new Error(`API request failed: ${verifyResponse.status} ${verifyResponse.statusText} - ${errorText}`)
         }
+        
+        return await verifyResponse.json()
+      })
+      
+      console.log(`📄 Folder info:`, folderInfo)
+      
+      if (!folderInfo.trashed && folderInfo.name === folderName) {
+        console.log(`✅ Using saved ${folderName} folder ID:`, savedFolderId)
+        return { id: savedFolderId }
       } else {
-        console.log(`⚠️ Saved ${folderName} folder ID is invalid`)
-        const errorText = await verifyResponse.text()
-        console.log(`📄 Error response:`, errorText)
+        console.log(`⚠️ Saved ${folderName} folder is trashed or has wrong name`)
+        console.log(`📄 Expected name: ${folderName}, actual name: ${folderInfo.name}`)
+        console.log(`📄 Trashed: ${folderInfo.trashed}`)
         localStorage.removeItem(getSubFolderStorageKey(folderName))
-        throw new Error(`保存された${folderName}フォルダが見つかりません。ログインしてください。`)
+        // 1回だけ再作成を試みる
+        if (retryCount === 0) {
+          try {
+            // ensureAppFolderを直接呼び出す（getAppFolderIdを経由しない）
+            const appFolder = await executeWithTokenRefresh(async (token) => {
+              return await ensureAppFolder(token)
+            })
+            // サブフォルダを確保
+            await executeWithTokenRefresh(async (token) => {
+              return await ensureSubFolders(token, appFolder.id)
+            })
+            // 再取得を試みる
+            const recreatedFolderId = localStorage.getItem(storageKey)
+            if (recreatedFolderId) {
+              return { id: recreatedFolderId }
+            }
+          } catch (ensureErr) {
+            console.error(`Failed to ensure ${folderName} folder:`, ensureErr)
+            if (isTokenExpiredError(ensureErr)) {
+              throw new Error('認証が期限切れです。再度ログインしてください。')
+            }
+          }
+        }
+        throw new Error(`保存された${folderName}フォルダが無効です。ログインしてください。`)
       }
     } catch (err) {
       console.error(`Failed to verify ${folderName} folder ID:`, err)
+      
+      // 401エラーの場合は再作成を試みない（既にリフレッシュ済み）
+      if (isTokenExpiredError(err)) {
+        throw new Error('認証が期限切れです。再度ログインしてください。')
+      }
+      
       localStorage.removeItem(getSubFolderStorageKey(folderName))
+      // 1回だけ再作成を試みる
+      if (retryCount === 0) {
+        try {
+          // ensureAppFolderを直接呼び出す（getAppFolderIdを経由しない）
+          const appFolder = await executeWithTokenRefresh(async (token) => {
+            return await ensureAppFolder(token)
+          })
+          // サブフォルダを確保
+          await executeWithTokenRefresh(async (token) => {
+            return await ensureSubFolders(token, appFolder.id)
+          })
+          // 再取得を試みる
+          const recreatedFolderId = localStorage.getItem(storageKey)
+          if (recreatedFolderId) {
+            return { id: recreatedFolderId }
+          }
+        } catch (ensureErr) {
+          console.error(`Failed to ensure ${folderName} folder:`, ensureErr)
+          if (isTokenExpiredError(ensureErr)) {
+            throw new Error('認証が期限切れです。再度ログインしてください。')
+          }
+        }
+      }
       throw new Error(`${folderName}フォルダの検証に失敗しました。ログインしてください。`)
     }
+  }
+  
+  // 開発者向け: トークン有効期限情報をコンソールに表示
+  const logTokenExpirationInfo = async () => {
+    const info = await getTokenExpirationInfo()
+    
+    if (!info.hasToken) {
+      console.log('🔑 トークン情報:', info.message)
+      return info
+    }
+    
+    if (!info.isValid) {
+      console.log('❌ トークン情報:', info.message || info.error)
+      return info
+    }
+    
+    if (info.expiresIn) {
+      console.log('🔑 トークン有効期限情報:')
+      console.log(`  - 有効期限まで: ${info.expiresInFormatted}`)
+      console.log(`  - 有効期限日時: ${info.expiresAtFormatted}`)
+      console.log(`  - 残り時間: ${info.remainingHours}時間 ${info.remainingMinutes % 60}分 ${info.remainingSeconds % 60}秒`)
+      console.log(`  - 有効期限（秒）: ${info.expiresIn}秒`)
+    } else {
+      console.log('🔑 トークン情報:', info.message || '有効期限情報が取得できませんでした')
+      if (info.tokenInfo) {
+        console.log('  - トークン情報:', info.tokenInfo)
+      }
+    }
+    
+    return info
   }
   
   return {
@@ -729,6 +1119,8 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signOut,
     getAccessToken,
+    getTokenExpirationInfo,
+    logTokenExpirationInfo,
     ensureAppFolder,
     getAppFolderId,
     getSubFolderId,

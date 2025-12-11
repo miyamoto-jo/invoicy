@@ -157,24 +157,23 @@
           売上書込み
         </button>
         
-        <!-- 売上反映ボタン -->
-        <div v-if="localSales.length > 0" class="sales-reflect-section">
-          <button 
-            type="button" 
-            @click="handleReflectSales" 
-            class="btn btn-success"
-          >
-            売上反映
-          </button>
-          <span class="sales-count">({{ localSales.length }}件)</span>
-        </div>
-        
         <button 
           type="button" 
           @click="handleCancel" 
           class="btn btn-secondary"
         >
           キャンセル
+        </button>
+      </div>
+      
+      <!-- 売上反映ボタン -->
+      <div v-if="localSales.length > 0" class="sales-reflect-section">
+        <button 
+          type="button" 
+          @click="handleReflectSales" 
+          class="btn btn-danger"
+        >
+          売上反映（{{ localSales.length }}件）
         </button>
       </div>
     </form>
@@ -184,7 +183,7 @@
       <div class="modal-content" @click.stop>
         <h3>確認</h3>
         <p v-if="localSales.length > 0">
-          ダッシュボードに戻りますか？<br>
+          反映されていない売上があります。本当に画面移動しますか？<br>
           入力した内容とローカルメモリの売上情報は消えますが大丈夫ですか？
         </p>
         <p v-else>
@@ -520,8 +519,10 @@ const showToast = (message, type = 'success') => {
 }
 
 const handleCancel = () => {
-  // ローカルメモリに売上情報がある場合、または商品が選択されている場合に確認ダイアログを表示
-  if (localSales.value.length > 0 || selectedProducts.value.length > 0 || formData.value.note) {
+  // ローカルメモリに売上情報がある場合は必ず確認ダイアログを表示
+  if (localSales.value.length > 0) {
+    showCancelDialog.value = true
+  } else if (selectedProducts.value.length > 0 || formData.value.note) {
     showCancelDialog.value = true
   } else {
     emit('cancel')
@@ -581,10 +582,15 @@ onMounted(async () => {
   }
 })
 
+// 未反映の売上があるかどうかを判定するcomputed
+const hasUnreflectedSales = computed(() => localSales.value.length > 0)
+
 // 外部から呼び出せるメソッドを定義
 defineExpose({
   clearForm,
-  clearLocalSales
+  clearLocalSales,
+  localSales,
+  hasUnreflectedSales
 })
 
 // Watch for customer changes to reset selected products
@@ -612,8 +618,9 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
 </script>
 
 <style scoped>
+/* コンポーネント固有のスタイル */
 .sales-form {
-  max-width: 800px;
+  max-width: var(--form-max-width-large);
   margin: 0 auto;
 }
 
@@ -622,55 +629,6 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-.form-label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: #333;
-}
-
-.form-input,
-.form-select,
-.form-textarea {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  transition: border-color 0.2s;
-}
-
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.form-input.error,
-.form-select.error {
-  border-color: #dc3545;
-}
-
-.form-input:disabled,
-.form-select:disabled {
-  background-color: #f8f9fa;
-  color: #6c757d;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.error-message {
-  color: #dc3545;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
 }
 
 .customer-notice {
@@ -877,63 +835,25 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   border: 1px solid #f5c6cb;
 }
 
+/* コンポーネント固有のスタイル */
 .form-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
   align-items: center;
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e0e0e0;
 }
 
 .sales-reflect-section {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.sales-count {
-  color: #666;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
+  margin-top: 1rem;
 }
 
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #007bff;
+.btn-danger {
+  background-color: #dc3545;
   color: white;
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #545b62;
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
 }
 
 /* モーダルダイアログ */
@@ -998,10 +918,6 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   
   .form-actions {
     flex-direction: column;
-  }
-  
-  .btn {
-    width: 100%;
   }
   
   .modal-actions {

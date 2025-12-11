@@ -300,8 +300,9 @@ const handleSignOut = async () => {
   background-color: #f5f5f5;
 }
 
+/* コンポーネント固有のスタイル */
 .settings-form {
-  max-width: 600px;
+  max-width: var(--form-max-width);
   margin: 0 auto;
   background: white;
   border-radius: 8px;
@@ -310,119 +311,43 @@ const handleSignOut = async () => {
 }
 
 .form-header {
-  margin-bottom: 2rem;
   text-align: center;
 }
 
 .form-header h2 {
-  color: #333;
   margin-bottom: 0.5rem;
 }
 
-.form-header p {
-  color: #666;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-label {
-  font-weight: 500;
-  color: #333;
-}
-
 .required {
-  color: #dc3545;
-}
-
-.form-input,
-.form-textarea {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  transition: border-color 0.3s;
-}
-
-.form-input:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: #4285f4;
-  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
-}
-
-.form-input.error,
-.form-textarea.error {
-  border-color: #dc3545;
+  color: var(--error-color);
 }
 
 .form-hint {
   font-size: 0.875rem;
-  color: #666;
+  color: var(--text-color-secondary);
 }
 
-.error-message {
-  font-size: 0.875rem;
-  color: #dc3545;
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
-.form-textarea {
-  resize: vertical;
-  min-height: 80px;
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-.form-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e0e0e0;
-}
-
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
+.error-alert {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
   border-radius: 4px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #4285f4;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #3367d6;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #5a6268;
 }
 
 .loading-spinner {
@@ -454,13 +379,18 @@ const handleSignOut = async () => {
     padding: 1.5rem;
   }
   
-  .form-actions {
+  .form-header {
     flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
   }
   
-  .btn {
-    width: 100%;
-    justify-content: center;
+  .form-header h2 {
+    text-align: center;
+  }
+  
+  .form-header p {
+    text-align: center;
   }
 }
 </style> 

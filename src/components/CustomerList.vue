@@ -1,12 +1,13 @@
 <template>
   <div class="customer-list">
+    <!-- 検索・フィルター -->
     <div class="list-header">
       <div class="search-section">
         <input
           v-model="searchQuery"
           type="text"
           class="search-input"
-          placeholder="顧客名、管理用名称、住所で検索..."
+          placeholder="顧客名、管理用名称で検索..."
         />
       </div>
       <div class="header-actions">
@@ -15,76 +16,93 @@
         </div>
       </div>
     </div>
-    
+
+    <!-- エラーメッセージ -->
+    <div v-if="error" class="error-message">
+      {{ error }}
+    </div>
+
+    <!-- ローディング -->
     <div v-if="isLoading" class="loading">
-      <div class="spinner"></div>
-      <p>顧客データを読み込み中...</p>
+      <div class="loading-spinner"></div>
+      <p>データを読み込み中...</p>
     </div>
-    
-    <div v-else-if="error" class="error-message">
-      <p>{{ error }}</p>
-      <button @click="retryLoad" class="btn btn-primary">
-        再試行
-      </button>
-    </div>
-    
-    <div v-else-if="filteredCustomers.length === 0" class="empty-state">
-      <div class="empty-icon">👥</div>
-      <h3>{{ searchQuery ? '検索結果がありません' : '顧客が登録されていません' }}</h3>
-      <p v-if="!searchQuery">最初の顧客を登録してみましょう</p>
-      <p v-else>検索条件を変更してみてください</p>
-    </div>
-    
-    <div v-else class="customers-grid">
+
+    <!-- 顧客一覧 -->
+    <div v-else-if="filteredCustomers.length > 0" class="customers-grid">
       <div
         v-for="customer in filteredCustomers"
         :key="customer.id"
         class="customer-card"
-        @click="selectCustomer(customer)"
       >
         <div class="customer-header">
-          <h4 class="customer-name">{{ customer.getDisplayName() }}</h4>
+          <h3 class="customer-name">{{ customer.name }}</h3>
           <div class="customer-actions">
             <button
-              @click.stop="editCustomer(customer)"
-              class="btn-icon"
-              title="編集"
+              @click="$emit('edit', customer)"
+              class="btn btn-edit"
             >
-              ✏️
+              編集
             </button>
             <button
-              @click.stop="deleteCustomer(customer)"
-              class="btn-icon delete"
-              title="削除"
+              @click="confirmDelete(customer)"
+              class="btn btn-delete"
             >
-              🗑️
+              削除
             </button>
           </div>
         </div>
         
         <div class="customer-details">
           <div v-if="customer.alias" class="customer-alias">
-            <span class="label">管理用名称:</span>
-            <span>{{ customer.alias }}</span>
+            <strong>管理用名称:</strong> {{ customer.alias }}
           </div>
           <div v-if="customer.address" class="customer-address">
-            <span class="label">住所:</span>
-            <span>{{ customer.address }}</span>
+            <strong>住所:</strong> {{ customer.address }}
           </div>
           <div class="customer-closing-day">
-            <span class="label">締め日:</span>
-            <span>{{ customer.formatClosingDay() }}</span>
+            <strong>締め日:</strong> {{ customer.formatClosingDay() }}
           </div>
           <div class="customer-payment-method">
-            <span class="label">お支払い方法:</span>
-            <span>{{ customer.paymentMethod }}</span>
+            <strong>お支払い方法:</strong> {{ customer.paymentMethod }}
+          </div>
+          <div class="customer-dates">
+            <small>作成: {{ formatDate(customer.createdAt) }}</small>
+            <small>更新: {{ formatDate(customer.updatedAt) }}</small>
           </div>
         </div>
-        
-        <div class="customer-meta">
-          <span class="created-date">
-            作成日: {{ formatDate(customer.createdAt) }}
-          </span>
+      </div>
+    </div>
+
+    <!-- 空の状態 -->
+    <div v-else class="empty-state">
+      <div class="empty-icon">👥</div>
+      <h3>{{ searchQuery ? '検索結果がありません' : '顧客が登録されていません' }}</h3>
+      <p>{{ searchQuery ? '検索条件を変更してみてください' : '新規登録ボタンから顧客を追加してください。' }}</p>
+    </div>
+
+    <!-- 削除確認モーダル -->
+    <div v-if="showDeleteModal" class="modal-overlay" @click="cancelDelete">
+      <div class="modal" @click.stop>
+        <h3>顧客の削除</h3>
+        <p>「{{ customerToDelete?.name }}」を削除しますか？</p>
+        <p class="warning">この操作は取り消せません。</p>
+        <div class="modal-actions">
+          <button
+            @click="cancelDelete"
+            class="btn btn-secondary"
+            :disabled="isLoading"
+          >
+            キャンセル
+          </button>
+          <button
+            @click="deleteCustomer"
+            class="btn btn-danger"
+            :disabled="isLoading"
+          >
+            <span v-if="isLoading" class="loading-spinner"></span>
+            削除
+          </button>
         </div>
       </div>
     </div>
@@ -92,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useCustomersStore } from '../stores/customers'
 
 const props = defineProps({
@@ -106,50 +124,61 @@ const props = defineProps({
   },
   error: {
     type: String,
-    default: null
+    default: ''
   }
 })
 
-const emit = defineEmits(['select', 'edit', 'delete', 'retry', 'bulk-create'])
+const emit = defineEmits(['select', 'edit', 'delete', 'retry'])
 
 const customersStore = useCustomersStore()
-const searchQuery = ref('')
 
+// ローカル状態
+const searchQuery = ref('')
+const showDeleteModal = ref(false)
+const customerToDelete = ref(null)
+
+// 計算プロパティ
 const filteredCustomers = computed(() => {
-  return customersStore.searchCustomers(searchQuery.value)
+  let customers = customersStore.searchCustomers(searchQuery.value)
+  
+  // 更新日時の新しい順にソート
+  return [...customers].sort((a, b) => {
+    const dateA = new Date(a.updatedAt).getTime()
+    const dateB = new Date(b.updatedAt).getTime()
+    return dateB - dateA // 降順（新しい順）
+  })
 })
 
-const selectCustomer = (customer) => {
-  emit('select', customer)
-}
-
-const editCustomer = (customer) => {
-  emit('edit', customer)
-}
-
-const deleteCustomer = async (customer) => {
-  if (confirm(`「${customer.getDisplayName()}」を削除しますか？\nこの操作は取り消せません。`)) {
-    emit('delete', customer)
-  }
-}
-
-const retryLoad = () => {
-  emit('retry')
-}
-
+// 日付をフォーマット（日時を含む）
 const formatDate = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('ja-JP', {
+  return new Date(dateString).toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit'
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
   })
 }
 
-// 検索クエリの変更を監視
-watch(searchQuery, (newQuery) => {
-  // 必要に応じて検索のデバウンス処理を追加
-})
+// 削除確認
+const confirmDelete = (customer) => {
+  customerToDelete.value = customer
+  showDeleteModal.value = true
+}
+
+// 削除キャンセル
+const cancelDelete = () => {
+  showDeleteModal.value = false
+  customerToDelete.value = null
+}
+
+// 顧客削除
+const deleteCustomer = async () => {
+  if (customerToDelete.value) {
+    emit('delete', customerToDelete.value)
+    cancelDelete()
+  }
+}
 </script>
 
 <style scoped>
@@ -161,14 +190,8 @@ watch(searchQuery, (newQuery) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  gap: 20px;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 20px;
+  margin-bottom: 2rem;
+  gap: 1rem;
 }
 
 .search-section {
@@ -176,19 +199,10 @@ watch(searchQuery, (newQuery) => {
   max-width: 400px;
 }
 
-.search-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: border-color 0.3s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #4285f4;
-  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.1);
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 .stats {
@@ -202,23 +216,43 @@ watch(searchQuery, (newQuery) => {
   text-align: center;
 }
 
+.search-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  border: 1px solid #f5c6cb;
+}
+
 .loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
+  text-align: center;
+  padding: 3rem;
   color: #666;
 }
 
-.loading .spinner {
+.loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #4285f4;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin-bottom: 20px;
+  margin: 0 auto 1rem;
 }
 
 @keyframes spin {
@@ -226,109 +260,125 @@ watch(searchQuery, (newQuery) => {
   100% { transform: rotate(360deg); }
 }
 
-.error-message {
-  text-align: center;
-  padding: 40px 20px;
-  color: #e74c3c;
-}
-
-.error-message p {
-  margin-bottom: 20px;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: #666;
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 20px;
-}
-
-.empty-state h3 {
-  margin-bottom: 10px;
-  color: #333;
-}
-
-.empty-state p {
-  margin: 0;
-}
-
 .customers-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
+  gap: 1rem;
 }
 
 .customer-card {
   background: white;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 20px;
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  transition: box-shadow 0.2s;
 }
 
 .customer-card:hover {
-  border-color: #4285f4;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
 }
 
 .customer-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 15px;
+  margin-bottom: 0.75rem;
 }
 
 .customer-name {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #333;
   flex: 1;
-  margin-right: 10px;
 }
 
 .customer-actions {
   display: flex;
-  gap: 5px;
+  gap: 0.5rem;
 }
 
-.btn-icon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 5px;
-  border-radius: 4px;
-  transition: background-color 0.3s;
-  font-size: 16px;
+.btn.btn-edit {
+  background-color: #007bff;
+  color: white;
+  padding: 0.25rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
-.btn-icon:hover {
-  background-color: #f1f3f4;
+.btn.btn-edit:hover:not(:disabled) {
+  background-color: #0056b3;
 }
 
-.btn-icon.delete:hover {
-  background-color: #fde8e8;
+.btn.btn-delete {
+  background-color: #dc3545;
+  color: white;
+  padding: 0.25rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.btn.btn-delete:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.customer-details {
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.customer-details > div {
+  margin-bottom: 0.375rem;
+}
+
+.customer-alias {
+  font-style: italic;
+}
+
+.customer-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #eee;
+}
+
+.customer-dates small {
+  color: #999;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #666;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.empty-state p {
+  margin-bottom: 2rem;
 }
 
 .btn {
-  padding: 8px 16px;
+  padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
-  text-decoration: none;
+  transition: all 0.2s;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 0.5rem;
 }
 
 .btn:disabled {
@@ -337,46 +387,89 @@ watch(searchQuery, (newQuery) => {
 }
 
 .btn-primary {
-  background-color: #4285f4;
+  background-color: #007bff;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #3367d6;
+  background-color: #0056b3;
 }
 
-.customer-details {
-  margin-bottom: 15px;
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
 }
 
-.customer-alias,
-.customer-address,
-.customer-closing-day,
-.customer-payment-method {
-  margin-bottom: 8px;
-  font-size: 14px;
-  line-height: 1.4;
+.btn-secondary:hover:not(:disabled) {
+  background-color: #545b62;
 }
 
-.customer-alias .label,
-.customer-address .label,
-.customer-closing-day .label,
-.customer-payment-method .label {
-  font-weight: 500;
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: #6c757d;
+  border: 1px solid #6c757d;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: #6c757d;
+  color: white;
+}
+
+/* モーダル */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.modal p {
+  margin-bottom: 1rem;
   color: #666;
-  margin-right: 5px;
 }
 
-.customer-meta {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 10px;
+.warning {
+  color: #dc3545;
+  font-weight: 600;
 }
 
-.created-date {
-  font-size: 12px;
-  color: #999;
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
 }
 
+/* レスポンシブ */
 @media (max-width: 768px) {
   .list-header {
     flex-direction: column;
@@ -388,8 +481,16 @@ watch(searchQuery, (newQuery) => {
     max-width: none;
   }
   
+  .header-actions {
+    max-width: none;
+  }
+  
   .customers-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
   }
 }
 </style> 

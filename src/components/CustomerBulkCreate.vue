@@ -1,107 +1,101 @@
 <template>
   <div class="customer-bulk-create">
     <div class="manual-input-section">
-      <div class="input-header">
-        <h3>顧客一括登録</h3>
-        <div class="input-actions">
-          <button
-            @click="addCustomerRow"
-            class="btn btn-secondary"
-            :disabled="isLoading"
-          >
-            行を追加
-          </button>
-          <button
-            @click="clearAll"
-            class="btn btn-outline"
-            :disabled="isLoading || customerRows.length === 0"
-          >
-            全クリア
-          </button>
+      <div class="customers-cards-container">
+        <div
+          v-for="(row, index) in customerRows"
+          :key="index"
+          class="customer-card"
+        >
+          <div class="card-header">
+            <button
+              @click="removeCustomerRow(index)"
+              class="btn-close"
+              title="削除"
+              :disabled="customerRows.length === 1 || isLoading"
+            >
+              ×
+            </button>
+          </div>
+          
+          <div class="card-body">
+            <div class="form-field">
+              <label class="form-label">顧客名 *</label>
+              <input
+                v-model="row.name"
+                type="text"
+                class="form-input"
+                :class="{ 'error': row.errors.name }"
+                placeholder="顧客名"
+                :disabled="isLoading"
+              />
+              <span v-if="row.errors.name" class="error-message">{{ row.errors.name }}</span>
+            </div>
+            
+            <div class="form-field">
+              <label class="form-label">管理用名称</label>
+              <input
+                v-model="row.alias"
+                type="text"
+                class="form-input"
+                placeholder="管理用名称"
+                :disabled="isLoading"
+              />
+            </div>
+            
+            <div class="form-field">
+              <label class="form-label">住所</label>
+              <input
+                v-model="row.address"
+                type="text"
+                class="form-input"
+                placeholder="住所"
+                :disabled="isLoading"
+              />
+            </div>
+            
+            <div class="form-field">
+              <label class="form-label">締め日 *</label>
+              <select
+                v-model="row.closingDay"
+                class="form-select"
+                :class="{ 'error': row.errors.closingDay }"
+                :disabled="isLoading"
+              >
+                <option value="">選択</option>
+                <option v-for="day in 31" :key="day" :value="day">{{ day }}日</option>
+                <option value="末日">末日</option>
+              </select>
+              <span v-if="row.errors.closingDay" class="error-message">{{ row.errors.closingDay }}</span>
+            </div>
+            
+            <div class="form-field">
+              <label class="form-label">お支払い方法 *</label>
+              <select
+                v-model="row.paymentMethod"
+                class="form-select"
+                :class="{ 'error': row.errors.paymentMethod }"
+                :disabled="isLoading"
+              >
+                <option value="">選択</option>
+                <option value="振込">振込</option>
+                <option value="現金">現金</option>
+              </select>
+              <span v-if="row.errors.paymentMethod" class="error-message">{{ row.errors.paymentMethod }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="customers-table-container">
-        <table class="customers-input-table">
-          <thead>
-            <tr>
-              <th>顧客名 *</th>
-              <th>管理用名称</th>
-              <th>住所</th>
-              <th>締め日</th>
-              <th>お支払い方法</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(row, index) in customerRows"
-              :key="index"
-              class="customer-row"
-            >
-              <td>
-                <input
-                  v-model="row.name"
-                  type="text"
-                  class="form-input"
-                  :class="{ 'error': row.errors.name }"
-                  placeholder="顧客名"
-                />
-                <span v-if="row.errors.name" class="error-message">{{ row.errors.name }}</span>
-              </td>
-              <td>
-                <input
-                  v-model="row.alias"
-                  type="text"
-                  class="form-input"
-                  placeholder="管理用名称"
-                />
-              </td>
-              <td>
-                <input
-                  v-model="row.address"
-                  type="text"
-                  class="form-input"
-                  placeholder="住所"
-                />
-              </td>
-              <td>
-                <select
-                  v-model="row.closingDay"
-                  class="form-input"
-                  :class="{ 'error': row.errors.closingDay }"
-                >
-                  <option value="">選択</option>
-                  <option v-for="day in 31" :key="day" :value="day">{{ day }}日</option>
-                  <option value="末日">末日</option>
-                </select>
-                <span v-if="row.errors.closingDay" class="error-message">{{ row.errors.closingDay }}</span>
-              </td>
-              <td>
-                <select
-                  v-model="row.paymentMethod"
-                  class="form-input"
-                  :class="{ 'error': row.errors.paymentMethod }"
-                >
-                  <option value="">選択</option>
-                  <option value="振込">振込</option>
-                  <option value="現金">現金</option>
-                </select>
-                <span v-if="row.errors.paymentMethod" class="error-message">{{ row.errors.paymentMethod }}</span>
-              </td>
-              <td>
-                <button
-                  @click="removeCustomerRow(index)"
-                  class="btn-icon"
-                  title="削除"
-                  :disabled="customerRows.length === 1"
-                >
-                  🗑️
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="add-customer-section">
+        <button
+          @click="addCustomerRow"
+          class="btn-add"
+          title="行を追加"
+          :disabled="isLoading"
+        >
+          +
+        </button>
       </div>
 
       <div class="bulk-actions">
@@ -142,7 +136,19 @@ const customerRows = ref([{ name: '', alias: '', address: '', closingDay: '末�
 
 // 手動入力の行操作
 const addCustomerRow = () => {
-  customerRows.value.push({ name: '', alias: '', address: '', closingDay: '末日', paymentMethod: '振込', errors: {} })
+  // 直前の行（最後の行）の情報を取得
+  const lastRow = customerRows.value[customerRows.value.length - 1]
+  const closingDay = lastRow?.closingDay || '末日'
+  const paymentMethod = lastRow?.paymentMethod || '振込'
+  
+  customerRows.value.push({ 
+    name: '', 
+    alias: '', 
+    address: '', 
+    closingDay: closingDay, 
+    paymentMethod: paymentMethod, 
+    errors: {} 
+  })
 }
 
 const removeCustomerRow = (index) => {
@@ -220,96 +226,143 @@ const handleSubmit = () => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.input-header {
+.customers-cards-container {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.input-header h3 {
-  margin: 0;
-  color: #333;
-}
-
-.input-actions {
-  display: flex;
-  gap: 1rem;
-}
-
-.customers-table-container {
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 1.5rem;
   margin-bottom: 2rem;
 }
 
-.customers-input-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
+.customer-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+  position: relative;
+  transition: box-shadow 0.2s;
 }
 
-.customers-input-table th {
+.customer-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #999;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.btn-close:hover:not(:disabled) {
   background-color: #f8f9fa;
-  padding: 1rem 0.75rem;
-  text-align: left;
+  color: #dc3545;
+}
+
+.btn-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.add-customer-section {
+  display: flex;
+  justify-content: center;
+}
+
+.btn-add {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.btn-add:hover:not(:disabled) {
+  background-color: #218838;
+  transform: scale(1.1);
+}
+
+.btn-add:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-label {
   font-weight: 600;
   color: #333;
-  border-bottom: 2px solid #e0e0e0;
-  white-space: nowrap;
-}
-
-.customers-input-table td {
-  padding: 0.75rem;
-  border-bottom: 1px solid #e0e0e0;
-  vertical-align: top;
-}
-
-.customer-row:hover {
-  background-color: #f8f9fa;
-}
-
-.form-input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
   font-size: 0.9rem;
 }
 
-.form-input:focus {
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.form-input:focus,
+.form-select:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-.form-input.error {
+.form-input.error,
+.form-select.error {
   border-color: #dc3545;
+}
+
+.form-input:disabled,
+.form-select:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
 }
 
 .error-message {
   display: block;
-  margin-top: 0.25rem;
   color: #dc3545;
-  font-size: 0.8rem;
-}
-
-.btn-icon {
-  background: none;
-  border: none;
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.btn-icon:hover:not(:disabled) {
-  background-color: #f8f9fa;
-}
-
-.btn-icon:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
 }
 
 .bulk-actions {
@@ -384,14 +437,20 @@ const handleSubmit = () => {
 
 /* レスポンシブ */
 @media (max-width: 768px) {
-  .input-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
+  .manual-input-section {
+    padding: 1rem;
   }
   
-  .input-actions {
-    justify-content: center;
+  .customers-cards-container {
+    gap: 1rem;
+  }
+  
+  .customer-card {
+    padding: 0.75rem;
+  }
+  
+  .card-body {
+    gap: 0.75rem;
   }
   
   .bulk-actions {

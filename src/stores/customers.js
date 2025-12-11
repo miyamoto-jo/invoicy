@@ -325,8 +325,7 @@ export const useCustomersStore = defineStore('customers', () => {
     const searchTerm = query.toLowerCase()
     return sortedCustomers.value.filter(customer => 
       customer.name.toLowerCase().includes(searchTerm) ||
-      customer.alias.toLowerCase().includes(searchTerm) ||
-      customer.address.toLowerCase().includes(searchTerm)
+      customer.alias.toLowerCase().includes(searchTerm)
     )
   }
   

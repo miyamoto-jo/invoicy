@@ -25,39 +25,48 @@
 
         <!-- データファイル一覧 -->
         <div v-if="files.length > 0" class="files-section">
-          <div class="files-table-container">
-            <table class="files-table">
-              <thead>
-                <tr>
-                  <th class="checkbox-column">
-                    <input
-                      type="checkbox"
-                      :checked="allSelected"
-                      @change="toggleSelectAll"
-                      class="checkbox"
-                    />
-                  </th>
-                  <th class="filename-column">ファイル名</th>
-                  <th class="size-column">ファイルサイズ</th>
-                  <th class="date-column">更新日時</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="file in files" :key="file.id" class="file-row">
-                  <td class="checkbox-column">
-                    <input
-                      type="checkbox"
-                      :checked="selectedFiles.includes(file.id)"
-                      @change="toggleFileSelection(file.id)"
-                      class="checkbox"
-                    />
-                  </td>
-                  <td class="filename-column">{{ file.displayName }}</td>
-                  <td class="size-column">{{ file.formattedSize }}</td>
-                  <td class="date-column">{{ file.formattedDate }}</td>
-                </tr>
-              </tbody>
-            </table>
+          <!-- 全選択チェックボックス -->
+          <div class="select-all-container">
+            <label class="select-all-label">
+              <input
+                type="checkbox"
+                :checked="allSelected"
+                @change="toggleSelectAll"
+                class="checkbox"
+              />
+              <span>すべて選択</span>
+            </label>
+          </div>
+
+          <!-- ファイルカード一覧 -->
+          <div class="files-list">
+            <div
+              v-for="file in files"
+              :key="file.id"
+              class="file-card"
+              :class="{ 'selected': selectedFiles.includes(file.id) }"
+              @click="toggleFileSelection(file.id)"
+            >
+              <div class="file-card-checkbox" @click.stop>
+                <input
+                  type="checkbox"
+                  :checked="selectedFiles.includes(file.id)"
+                  @change.stop="toggleFileSelection(file.id)"
+                  class="checkbox"
+                />
+              </div>
+              <div class="file-card-content">
+                <div class="file-info-item">
+                  <span class="file-info-value filename-value">{{ file.displayName }}</span>
+                </div>
+                <div class="file-info-item">
+                  <span class="file-info-label">サイズ：<span class="file-info-value">{{ file.formattedSize }}</span></span>
+                </div>
+                <div class="file-info-item">
+                  <span class="file-info-label">更新日時：<span class="file-info-value">{{ file.formattedDate }}</span></span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -423,59 +432,93 @@ const hideToast = () => {
   margin-bottom: 2rem;
 }
 
-.files-table-container {
-  overflow-x: auto;
-  border: 1px solid #e0e0e0;
+/* 全選択コンテナ */
+.select-all-container {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: #f8f9fa;
   border-radius: 4px;
 }
 
-.files-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.files-table thead {
-  background-color: #f8f9fa;
-}
-
-.files-table th {
-  padding: 0.75rem;
-  text-align: left;
-  font-weight: 600;
+.select-all-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
   color: #333;
-  border-bottom: 2px solid #e0e0e0;
 }
 
-.files-table td {
-  padding: 0.75rem;
-  border-bottom: 1px solid #e0e0e0;
+/* ファイルリスト */
+.files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.files-table tbody tr:hover {
+/* ファイルカード */
+.file-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.file-card:hover {
   background-color: #f8f9fa;
+  border-color: #4285f4;
 }
 
-.checkbox-column {
-  width: 50px;
-  text-align: center;
+.file-card.selected {
+  background-color: #e8f0fe;
+  border-color: #4285f4;
+}
+
+.file-card-checkbox {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 0.25rem;
+  flex-shrink: 0;
+}
+
+.file-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.file-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.file-info-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #666;
+}
+
+.file-info-value {
+  font-size: 1rem;
+  color: #333;
+  word-break: break-word;
+}
+
+.filename-value {
+  font-weight: 500;
 }
 
 .checkbox {
   width: 18px;
   height: 18px;
   cursor: pointer;
-}
-
-.filename-column {
-  min-width: 200px;
-}
-
-.size-column {
-  width: 120px;
-}
-
-.date-column {
-  width: 180px;
+  flex-shrink: 0;
 }
 
 .loading-message,
@@ -725,28 +768,28 @@ const hideToast = () => {
 @media (max-width: 768px) {
   .deletion-container {
     margin: 0;
-    padding: 1.5rem;
+    padding: 1rem;
   }
 
-  .files-table-container {
+  .file-card {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+
+  .file-card-content {
+    gap: 0.5rem;
+  }
+
+  .file-info-label {
+    font-size: 0.8rem;
+  }
+
+  .file-info-value {
     font-size: 0.9rem;
   }
 
-  .files-table th,
-  .files-table td {
+  .select-all-container {
     padding: 0.5rem;
-  }
-
-  .filename-column {
-    min-width: 150px;
-  }
-
-  .size-column {
-    width: 100px;
-  }
-
-  .date-column {
-    width: 140px;
   }
 
   .actions {

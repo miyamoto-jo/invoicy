@@ -51,10 +51,6 @@
             <div class="menu-icon sales-icon">💰</div>
             <span class="menu-text">売上登録</span>
           </router-link>
-          <router-link to="/invoices" class="menu-item" @click="closeMenu">
-            <div class="menu-icon invoice-icon">📄</div>
-            <span class="menu-text">請求書作成</span>
-          </router-link>
           <router-link to="/sales/list" class="menu-item" @click="closeMenu">
             <div class="menu-icon sales-list-icon">📋</div>
             <span class="menu-text">売上一覧</span>
@@ -62,6 +58,14 @@
           <router-link to="/sales/analytics" class="menu-item" @click="closeMenu">
             <div class="menu-icon sales-analytics-icon">📈</div>
             <span class="menu-text">売上分析</span>
+          </router-link>
+          <router-link to="/invoices" class="menu-item" @click="closeMenu">
+            <div class="menu-icon invoice-icon">📄</div>
+            <span class="menu-text">請求書作成</span>
+          </router-link>
+          <router-link to="/invoices/analytics" class="menu-item" @click="closeMenu">
+            <div class="menu-icon invoice-analytics-icon">📊</div>
+            <span class="menu-text">請求書分析</span>
           </router-link>
         </div>
         
@@ -402,6 +406,10 @@ onUnmounted(() => {
 
 .invoice-icon {
   color: #388e3c;
+}
+
+.invoice-analytics-icon {
+  color: #ff6f00;
 }
 
 .customer-icon {

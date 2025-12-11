@@ -14,6 +14,7 @@ import SalesView from '../views/SalesView.vue'
 import SalesListView from '../views/SalesListView.vue'
 import SalesAnalyticsView from '../views/SalesAnalyticsView.vue'
 import InvoicesView from '../views/InvoicesView.vue'
+import InvoiceAnalyticsView from '../views/InvoiceAnalyticsView.vue'
 import DataDeletionView from '../views/DataDeletionView.vue'
 
 const routes = [
@@ -93,6 +94,12 @@ const routes = [
     path: '/invoices',
     name: 'invoices',
     component: InvoicesView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/invoices/analytics',
+    name: 'invoice-analytics',
+    component: InvoiceAnalyticsView,
     meta: { requiresAuth: true }
   },
   {

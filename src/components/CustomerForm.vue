@@ -1,12 +1,5 @@
 <template>
   <div class="customer-form">
-    <div class="form-header">
-      <h3>{{ isEditing ? '顧客編集' : '新規顧客登録' }}</h3>
-      <button @click="$emit('close')" class="btn btn-secondary">
-        ✕
-      </button>
-    </div>
-    
     <form @submit.prevent="handleSubmit" class="form">
       <div class="form-group">
         <label for="name" class="form-label">
@@ -206,18 +199,7 @@ const handleSubmit = () => {
 <style scoped>
 /* コンポーネント固有のスタイル */
 .customer-form {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-width: var(--form-max-width-small);
   width: 100%;
-}
-
-.form-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 
 .required {

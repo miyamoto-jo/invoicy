@@ -10,6 +10,11 @@
           placeholder="商品名で検索..."
         />
       </div>
+      <div class="header-actions">
+        <div class="stats">
+          <span class="stats-text">商品登録数: {{ filteredProducts.length }}件</span>
+        </div>
+      </div>
     </div>
 
     <!-- エラーメッセージ -->
@@ -31,21 +36,19 @@
         class="product-card"
       >
         <div class="product-header">
-          <h3 class="product-name">{{ product.getDisplayName() }}</h3>
+          <h3 class="product-name">{{ product.name }}</h3>
           <div class="product-actions">
             <button
               @click="$emit('edit', product)"
-              class="btn-icon"
-              title="編集"
+              class="btn btn-edit"
             >
-              ✏️
+              編集
             </button>
             <button
               @click="confirmDelete(product)"
-              class="btn-icon"
-              title="削除"
+              class="btn btn-delete"
             >
-              🗑️
+              削除
             </button>
           </div>
         </div>
@@ -57,7 +60,7 @@
           <div class="product-price">
             <strong>税抜金額:</strong> ¥{{ product.formatPrice() }}
           </div>
-                      <div v-if="product.usedByCustomerIds && product.usedByCustomerIds.length > 0" class="product-customer">
+            <div v-if="product.usedByCustomerIds && product.usedByCustomerIds.length > 0" class="product-customer">
               <strong>使用顧客:</strong> {{ getCustomerName(product.usedByCustomerIds[0]) }}
             </div>
           <div class="product-dates">
@@ -79,7 +82,7 @@
     <div v-if="showDeleteModal" class="modal-overlay" @click="cancelDelete">
       <div class="modal" @click.stop>
         <h3>商品の削除</h3>
-        <p>「{{ productToDelete?.getDisplayName() }}」を削除しますか？</p>
+        <p>「{{ productToDelete?.name }}」を削除しますか？</p>
         <p class="warning">この操作は取り消せません。</p>
         <div class="modal-actions">
           <button
@@ -133,15 +136,23 @@ const productToDelete = ref(null)
 
 // 計算プロパティ
 const filteredProducts = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return props.products
+  let products = props.products
+  
+  // 検索フィルタリング
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    products = products.filter(product => 
+      product.getDisplayName().toLowerCase().includes(query) ||
+      product.alias.toLowerCase().includes(query)
+    )
   }
   
-  const query = searchQuery.value.toLowerCase()
-  return props.products.filter(product => 
-    product.getDisplayName().toLowerCase().includes(query) ||
-    product.alias.toLowerCase().includes(query)
-  )
+  // 更新日時の新しい順にソート
+  return [...products].sort((a, b) => {
+    const dateA = new Date(a.updatedAt).getTime()
+    const dateB = new Date(b.updatedAt).getTime()
+    return dateB - dateA // 降順（新しい順）
+  })
 })
 
 // 初期化
@@ -158,9 +169,15 @@ const getCustomerName = (customerId) => {
   return customer ? customer.getDisplayName() : '不明'
 }
 
-// 日付をフォーマット
+// 日付をフォーマット（日時を含む）
 const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('ja-JP')
+  return new Date(dateString).toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 // 削除確認
@@ -191,7 +208,7 @@ const deleteProduct = async () => {
 
 .list-header {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
   gap: 1rem;
@@ -200,6 +217,23 @@ const deleteProduct = async () => {
 .search-section {
   flex: 1;
   max-width: 400px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+}
+
+.stats-text {
+  color: #666;
+  font-size: 14px;
+  text-align: center;
 }
 
 .search-input {
@@ -249,14 +283,14 @@ const deleteProduct = async () => {
 .products-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .product-card {
   background: white;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 1.5rem;
+  padding: 1rem;
   transition: box-shadow 0.2s;
 }
 
@@ -268,12 +302,12 @@ const deleteProduct = async () => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .product-name {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1rem; /* product-detailsより少し大きめ */
   font-weight: 600;
   color: #333;
   flex: 1;
@@ -284,26 +318,37 @@ const deleteProduct = async () => {
   gap: 0.5rem;
 }
 
-.btn-icon {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+.btn.btn-edit {
+  background-color: #007bff;
+  color: white;
+  padding: 0.25rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
-.btn-icon:hover {
-  background-color: #f8f9fa;
+.btn.btn-edit:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.btn.btn-delete {
+  background-color: #dc3545;
+  color: white;
+  padding: 0.25rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.btn.btn-delete:hover:not(:disabled) {
+  background-color: #c82333;
 }
 
 .product-details {
   color: #666;
+  font-size: 0.875rem; /* smallタグと同じサイズ */
 }
 
 .product-details > div {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.375rem;
 }
 
 .product-alias {
@@ -311,7 +356,7 @@ const deleteProduct = async () => {
 }
 
 .product-price {
-  font-size: 1.1rem;
+  font-size: 0.875rem; /* smallタグと同じサイズに変更 */
   font-weight: 600;
   color: #28a745;
 }
@@ -324,8 +369,8 @@ const deleteProduct = async () => {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
   border-top: 1px solid #eee;
 }
 
@@ -459,9 +504,14 @@ const deleteProduct = async () => {
   .list-header {
     flex-direction: column;
     align-items: stretch;
+    gap: 15px;
   }
   
   .search-section {
+    max-width: none;
+  }
+  
+  .header-actions {
     max-width: none;
   }
   

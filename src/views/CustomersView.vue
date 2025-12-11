@@ -20,96 +20,120 @@
       </div>
     </div>
     
-    <div class="content-wrapper">
+    <div class="customers-content">
       <!-- 顧客一覧 -->
-      <div class="list-section">
-            <CustomerList
-              :customers="customersStore.customers"
-              :is-loading="customersStore.isLoading"
-              :error="customersStore.error"
-              @select="selectCustomer"
-              @edit="editCustomer"
-              @delete="deleteCustomer"
-              @retry="retryLoad"
-              @bulk-create="showBulkCreateForm"
-            />
+      <div v-if="!showForm && !showBulkCreate && !showDetail" class="card">
+        <CustomerList
+          :customers="customersStore.customers"
+          :is-loading="customersStore.isLoading"
+          :error="customersStore.error"
+          @select="selectCustomer"
+          @edit="showEditForm"
+          @delete="deleteCustomer"
+          @retry="retryLoad"
+        />
+      </div>
+
+      <!-- 顧客フォーム -->
+      <div v-else-if="showForm" class="card">
+        <div class="card-header">
+          <h2>{{ isEdit ? '顧客編集' : '顧客登録' }}</h2>
+          <button
+            @click="hideForm"
+            class="btn btn-secondary"
+          >
+            一覧に戻る
+          </button>
+        </div>
+        
+        <CustomerForm
+          :customer="editingCustomer"
+          :is-submitting="isSubmitting"
+          @submit="handleSubmit"
+          @close="hideForm"
+        />
+      </div>
+
+      <!-- 一括登録フォーム -->
+      <div v-else-if="showBulkCreate" class="card">
+        <div class="card-header">
+          <h2>顧客一括登録</h2>
+          <button
+            @click="hideBulkCreateForm"
+            class="btn btn-secondary"
+          >
+            一覧に戻る
+          </button>
+        </div>
+        
+        <CustomerBulkCreate
+          :is-loading="isSubmitting"
+          @submit="handleBulkSubmit"
+          @cancel="hideBulkCreateForm"
+        />
+      </div>
+
+      <!-- 顧客詳細 -->
+      <div v-else-if="showDetail" class="card">
+        <div class="card-header">
+          <h2>顧客詳細</h2>
+          <button @click="closeDetail" class="btn btn-secondary">
+            一覧に戻る
+          </button>
+        </div>
+        
+        <div class="customer-detail">
+          <div class="detail-content">
+            <div class="detail-item">
+              <span class="label">顧客名:</span>
+              <span class="value">{{ selectedCustomer.getDisplayName() }}</span>
+            </div>
+            
+            <div v-if="selectedCustomer.alias" class="detail-item">
+              <span class="label">管理用名称:</span>
+              <span class="value">{{ selectedCustomer.alias }}</span>
+            </div>
+            
+            <div v-if="selectedCustomer.address" class="detail-item">
+              <span class="label">住所:</span>
+              <span class="value">{{ selectedCustomer.address }}</span>
+            </div>
+            
+            <div class="detail-item">
+              <span class="label">作成日:</span>
+              <span class="value">{{ formatDate(selectedCustomer.createdAt) }}</span>
+            </div>
+            
+            <div class="detail-item">
+              <span class="label">更新日:</span>
+              <span class="value">{{ formatDate(selectedCustomer.updatedAt) }}</span>
+            </div>
           </div>
           
-          <!-- 顧客詳細・フォーム・一括登録 -->
-          <div v-if="showForm || selectedCustomer || showBulkCreate" class="detail-section">
-            <div v-if="showBulkCreate" class="form-container">
-              <CustomerBulkCreate
-                :is-loading="isSubmitting"
-                @submit="handleBulkSubmit"
-                @cancel="closeBulkCreateForm"
-              />
-            </div>
-            
-            <div v-else-if="showForm" class="form-container">
-              <CustomerForm
-                :customer="editingCustomer"
-                :is-submitting="isSubmitting"
-                @submit="handleFormSubmit"
-                @close="closeForm"
-              />
-            </div>
-            
-            <div v-else-if="selectedCustomer" class="customer-detail">
-              <div class="detail-header">
-                <h3>顧客詳細</h3>
-                <button @click="closeDetail" class="btn btn-secondary">
-                  ✕
-                </button>
-              </div>
-              
-              <div class="detail-content">
-                <div class="detail-item">
-                  <span class="label">顧客名:</span>
-                  <span class="value">{{ selectedCustomer.getDisplayName() }}</span>
-                </div>
-                
-                <div v-if="selectedCustomer.alias" class="detail-item">
-                  <span class="label">管理用名称:</span>
-                  <span class="value">{{ selectedCustomer.alias }}</span>
-                </div>
-                
-                <div v-if="selectedCustomer.address" class="detail-item">
-                  <span class="label">住所:</span>
-                  <span class="value">{{ selectedCustomer.address }}</span>
-                </div>
-                
-                <div class="detail-item">
-                  <span class="label">作成日:</span>
-                  <span class="value">{{ formatDate(selectedCustomer.createdAt) }}</span>
-                </div>
-                
-                <div class="detail-item">
-                  <span class="label">更新日:</span>
-                  <span class="value">{{ formatDate(selectedCustomer.updatedAt) }}</span>
-                </div>
-              </div>
-              
-              <div class="detail-actions">
-                <button @click="editSelectedCustomer" class="btn btn-primary">
-                  編集
-                </button>
-                <button @click="deleteSelectedCustomer" class="btn btn-secondary">
-                  削除
-                </button>
-              </div>
-            </div>
+          <div class="detail-actions">
+            <button
+              @click="editSelectedCustomer"
+              class="btn btn-primary"
+            >
+              編集
+            </button>
+            <button @click="deleteSelectedCustomer" class="btn btn-secondary">
+              削除
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </AppLayout>
     
-    <!-- 成功メッセージ -->
-    <div v-if="successMessage" class="success-toast">
-      {{ successMessage }}
-    </div>
+  <!-- 成功メッセージ -->
+  <div v-if="successMessage" class="success-toast">
+    {{ successMessage }}
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useCustomersStore } from '../stores/customers'
 import { useLoading } from '../composables/useLoading'
 import CustomerList from '../components/CustomerList.vue'
@@ -120,35 +144,56 @@ import AppLayout from '../components/AppLayout.vue'
 const customersStore = useCustomersStore()
 const { setLoading, clearLoading } = useLoading()
 
-// State
+// ローカル状態
 const showForm = ref(false)
 const showBulkCreate = ref(false)
+const showDetail = ref(false)
 const selectedCustomer = ref(null)
 const editingCustomer = ref(null)
 const isSubmitting = ref(false)
 const successMessage = ref('')
 
+// ストアから状態を取得
+const customers = computed(() => customersStore.customers)
+const isLoading = computed(() => customersStore.isLoading)
+const error = computed(() => customersStore.error)
+
+// 計算プロパティ
+const isEdit = computed(() => !!editingCustomer.value)
+
 // 初期化
 onMounted(async () => {
   try {
-    setLoading(true, '顧客データを読み込み中...', '顧客情報を取得しています')
-    await customersStore.initializeCustomers()
+    // 既にデータが存在する場合はスキップ
+    if (customersStore.customers.length === 0) {
+      setLoading(true, '顧客データを読み込み中...', '顧客情報を取得しています')
+      await customersStore.initializeCustomers()
+      clearLoading()
+    }
   } catch (err) {
     console.error('Failed to initialize customers:', err)
-  } finally {
     clearLoading()
   }
 })
 
-// Actions
+// フォーム表示制御
 const showCreateForm = () => {
   editingCustomer.value = null
-  selectedCustomer.value = null
   showForm.value = true
   showBulkCreate.value = false
+  showDetail.value = false
+  selectedCustomer.value = null
 }
 
-const closeForm = () => {
+const showEditForm = (customer) => {
+  editingCustomer.value = customer
+  showForm.value = true
+  showBulkCreate.value = false
+  showDetail.value = false
+  selectedCustomer.value = null
+}
+
+const hideForm = () => {
   showForm.value = false
   editingCustomer.value = null
 }
@@ -156,39 +201,81 @@ const closeForm = () => {
 const showBulkCreateForm = () => {
   showForm.value = false
   showBulkCreate.value = true
+  showDetail.value = false
   selectedCustomer.value = null
 }
 
-const closeBulkCreateForm = () => {
+const hideBulkCreateForm = () => {
   showBulkCreate.value = false
 }
 
+// 顧客詳細表示制御
 const selectCustomer = (customer) => {
   selectedCustomer.value = customer
+  showDetail.value = true
   showForm.value = false
   showBulkCreate.value = false
 }
 
 const closeDetail = () => {
   selectedCustomer.value = null
-}
-
-const editCustomer = (customer) => {
-  editingCustomer.value = customer
-  selectedCustomer.value = null
-  showForm.value = true
-  showBulkCreate.value = false
+  showDetail.value = false
 }
 
 const editSelectedCustomer = () => {
   if (selectedCustomer.value) {
     editingCustomer.value = selectedCustomer.value
     selectedCustomer.value = null
+    showDetail.value = false
     showForm.value = true
     showBulkCreate.value = false
   }
 }
 
+// フォーム送信処理
+const handleSubmit = async (customerData) => {
+  try {
+    isSubmitting.value = true
+    setLoading(true, '保存中...', '顧客情報を保存しています')
+    
+    if (isEdit.value) {
+      await customersStore.updateCustomer(editingCustomer.value.id, customerData)
+      showSuccessMessage(`「${customerData.name}」を更新しました`)
+    } else {
+      await customersStore.createCustomer(customerData)
+      showSuccessMessage(`「${customerData.name}」を登録しました`)
+    }
+    
+    // 成功時は一覧に戻る
+    hideForm()
+  } catch (err) {
+    console.error('Failed to save customer:', err)
+  } finally {
+    isSubmitting.value = false
+    clearLoading()
+  }
+}
+
+// 一括登録処理
+const handleBulkSubmit = async (customersData) => {
+  try {
+    isSubmitting.value = true
+    setLoading(true, '一括登録中...', `${customersData.length}件の顧客を登録しています`)
+    
+    await customersStore.bulkCreateCustomers(customersData)
+    showSuccessMessage(`${customersData.length}件の顧客を登録しました`)
+    
+    // 成功時は一覧に戻る
+    hideBulkCreateForm()
+  } catch (err) {
+    console.error('Failed to bulk create customers:', err)
+  } finally {
+    isSubmitting.value = false
+    clearLoading()
+  }
+}
+
+// 削除処理
 const deleteCustomer = async (customer) => {
   try {
     setLoading(true, '削除中...', `「${customer.getDisplayName()}」を削除しています`)
@@ -198,6 +285,7 @@ const deleteCustomer = async (customer) => {
     // 削除された顧客が選択されている場合は詳細を閉じる
     if (selectedCustomer.value && selectedCustomer.value.id === customer.id) {
       selectedCustomer.value = null
+      showDetail.value = false
     }
   } catch (err) {
     console.error('Failed to delete customer:', err)
@@ -209,45 +297,6 @@ const deleteCustomer = async (customer) => {
 const deleteSelectedCustomer = async () => {
   if (selectedCustomer.value) {
     await deleteCustomer(selectedCustomer.value)
-  }
-}
-
-const handleFormSubmit = async (customerData) => {
-  try {
-    isSubmitting.value = true
-    setLoading(true, '保存中...', '顧客情報を保存しています')
-    
-    if (editingCustomer.value) {
-      await customersStore.updateCustomer(editingCustomer.value.id, customerData)
-      showSuccessMessage(`「${customerData.name}」を更新しました`)
-    } else {
-      await customersStore.createCustomer(customerData)
-      showSuccessMessage(`「${customerData.name}」を登録しました`)
-    }
-    
-    closeForm()
-  } catch (err) {
-    console.error('Failed to save customer:', err)
-  } finally {
-    isSubmitting.value = false
-    clearLoading()
-  }
-}
-
-const handleBulkSubmit = async (customersData) => {
-  try {
-    isSubmitting.value = true
-    setLoading(true, '一括登録中...', `${customersData.length}件の顧客を登録しています`)
-    
-    await customersStore.bulkCreateCustomers(customersData)
-    showSuccessMessage(`${customersData.length}件の顧客を登録しました`)
-    
-    closeBulkCreateForm()
-  } catch (err) {
-    console.error('Failed to bulk create customers:', err)
-  } finally {
-    isSubmitting.value = false
-    clearLoading()
   }
 }
 
@@ -287,70 +336,59 @@ const formatDate = (dateString) => {
   margin-bottom: 2rem;
 }
 
-.customers-header h1 {
-  color: #333;
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0;
-}
-
 .header-actions {
   display: flex;
   gap: 1rem;
 }
 
-.content-wrapper {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 20px;
+.customers-header h1 {
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
 }
 
-.list-section {
+.customers-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.card {
   background: white;
   border-radius: 8px;
-  padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
-.detail-section {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  height: fit-content;
-}
-
-.form-container {
-  width: 100%;
-}
-
-.customer-detail {
-  width: 100%;
-}
-
-.detail-header {
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
+  padding: 1.5rem 2rem;
   border-bottom: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
 }
 
-.detail-header h3 {
+.card-header h2 {
   margin: 0;
   color: #333;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.customer-detail {
+  padding: 2rem;
 }
 
 .detail-content {
-  margin-bottom: 20px;
+  margin-bottom: 2rem;
 }
 
 .detail-item {
   display: flex;
-  margin-bottom: 15px;
-  padding: 10px 0;
+  margin-bottom: 1rem;
+  padding: 0.75rem 0;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -362,7 +400,7 @@ const formatDate = (dateString) => {
   font-weight: 500;
   color: #666;
   min-width: 120px;
-  margin-right: 15px;
+  margin-right: 1rem;
 }
 
 .detail-item .value {
@@ -372,8 +410,8 @@ const formatDate = (dateString) => {
 
 .detail-actions {
   display: flex;
-  gap: 10px;
-  padding-top: 20px;
+  gap: 1rem;
+  padding-top: 1.5rem;
   border-top: 1px solid #e0e0e0;
 }
 
@@ -415,9 +453,11 @@ const formatDate = (dateString) => {
   gap: 0.5rem;
 }
 
-.btn:disabled {
+.btn:disabled,
+.btn.disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-primary {
@@ -425,19 +465,19 @@ const formatDate = (dateString) => {
   color: white;
 }
 
-.btn-primary:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled):not(.disabled) {
   background-color: #0056b3;
 }
 
 .btn-outline {
-  background-color: transparent;
-  color: #007bff;
-  border: 1px solid #007bff;
+  background-color: #ffe0e0;
+  color: #c82333;
+  border: 1px solid #f5c6cb;
 }
 
-.btn-outline:hover:not(:disabled) {
-  background-color: #007bff;
-  color: white;
+.btn-outline:hover:not(:disabled):not(.disabled) {
+  background-color: #ffcccc;
+  border-color: #f5c6cb;
 }
 
 .btn-secondary {
@@ -445,16 +485,11 @@ const formatDate = (dateString) => {
   color: white;
 }
 
-.btn-secondary:hover:not(:disabled) {
+.btn-secondary:hover:not(:disabled):not(.disabled) {
   background-color: #545b62;
 }
 
-@media (min-width: 1024px) {
-  .content-wrapper {
-    grid-template-columns: 1fr 400px;
-  }
-}
-
+/* レスポンシブ */
 @media (max-width: 768px) {
   .customers-header {
     flex-direction: column;
@@ -466,14 +501,24 @@ const formatDate = (dateString) => {
     justify-content: center;
   }
   
+  .card-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
   .detail-item {
     flex-direction: column;
-    gap: 5px;
+    gap: 0.5rem;
   }
   
   .detail-item .label {
     min-width: auto;
     margin-right: 0;
+  }
+  
+  .detail-actions {
+    flex-direction: column;
   }
 }
 </style> 

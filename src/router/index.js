@@ -6,6 +6,8 @@ import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import BusinessSettingsView from '../views/BusinessSettingsView.vue'
 import CustomersView from '../views/CustomersView.vue'
+import CustomerCreateView from '../views/CustomerCreateView.vue'
+import CustomerBulkCreateView from '../views/CustomerBulkCreateView.vue'
 import ProductsView from '../views/ProductsView.vue'
 import TaxesView from '../views/TaxesView.vue'
 import SalesView from '../views/SalesView.vue'
@@ -37,6 +39,24 @@ const routes = [
     path: '/customers',
     name: 'customers',
     component: CustomersView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/customers/create',
+    name: 'customer-create',
+    component: CustomerCreateView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/customers/edit/:id',
+    name: 'customer-edit',
+    component: CustomerCreateView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/customers/bulk-create',
+    name: 'customer-bulk-create',
+    component: CustomerBulkCreateView,
     meta: { requiresAuth: true }
   },
   {

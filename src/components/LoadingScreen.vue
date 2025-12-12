@@ -210,20 +210,4 @@ onMounted(async () => {
     font-size: 0.85rem;
   }
 }
-
-/* ダークモード対応 */
-@media (prefers-color-scheme: dark) {
-  .loading-content {
-    background: rgba(30, 30, 30, 0.95);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-  
-  .loading-text h3 {
-    color: #fff;
-  }
-  
-  .loading-text p {
-    color: #ccc;
-  }
-}
 </style>

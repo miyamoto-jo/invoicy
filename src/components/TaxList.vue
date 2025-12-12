@@ -1,7 +1,7 @@
 <template>
   <div class="tax-list">
     <div class="list-header">
-      <h3>税率一覧 ({{ taxesCount }}件)</h3>
+      <h4>税率一覧 ({{ taxesCount }}件)</h4>
       <button @click="$emit('add')" class="btn btn-primary">
         <span>➕</span>
         税率追加

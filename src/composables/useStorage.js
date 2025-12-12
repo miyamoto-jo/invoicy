@@ -6,6 +6,41 @@ import { STORAGE_KEYS } from '../config/api.js'
  */
 export function useStorage() {
   /**
+   * TTL付きでデータを保存
+   * @param {string} key - 保存キー
+   * @param {any} data - 保存するデータ
+   */
+  const saveWithTimestamp = (key, data) => {
+    const payload = {
+      data,
+      timestamp: Date.now()
+    }
+    saveToLocalStorage(key, payload)
+  }
+
+  /**
+   * TTL付きでデータを取得
+   * @param {string} key - 読み込みキー
+   * @param {number} ttlMs - ミリ秒単位のTTL
+   * @returns {any|null} TTL内のデータ、またはnull
+   */
+  const loadWithTTL = (key, ttlMs) => {
+    const cached = loadFromLocalStorage(key)
+    if (!cached) return null
+
+    // 旧形式（timestampなし）との後方互換
+    if (cached.timestamp === undefined) {
+      return cached
+    }
+
+    const { data, timestamp } = cached
+    if (timestamp && ttlMs && Date.now() - timestamp <= ttlMs) {
+      return data
+    }
+    return null
+  }
+
+  /**
    * データをローカルストレージに保存
    * @param {string} key - 保存キー
    * @param {any} data - 保存するデータ
@@ -78,6 +113,8 @@ export function useStorage() {
   return {
     saveToLocalStorage,
     loadFromLocalStorage,
+    saveWithTimestamp,
+    loadWithTTL,
     clearAppData,
     removeFromLocalStorage,
     hasInLocalStorage,

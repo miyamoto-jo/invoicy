@@ -306,7 +306,7 @@ const handleSignOut = async () => {
   margin: 0 auto;
   background: white;
   border-radius: 8px;
-  padding: 2rem;
+  padding: 1rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
@@ -375,8 +375,8 @@ const handleSignOut = async () => {
 
 @media (max-width: 768px) {
   .settings-form {
-    margin: 0 1rem;
-    padding: 1.5rem;
+    margin: 0 0rem;
+    padding: 1.5 0.5rem;
   }
   
   .form-header {

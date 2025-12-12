@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
-import { APP_CONFIG } from '../config/api.js'
+import { APP_CONFIG, STORAGE_KEYS } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
 import { Product } from '../models/Product.js'
+import { useStorage } from '../composables/useStorage.js'
 
 export const useProductsStore = defineStore('products', () => {
+  const PRODUCTS_CACHE_TTL = 10 * 60 * 1000 // 10分
+
   // State
   const products = ref([])
   const isLoading = ref(false)
@@ -22,6 +25,18 @@ export const useProductsStore = defineStore('products', () => {
   
   // Google Drive API設定
   const PRODUCTS_FILE = `masters/${APP_CONFIG.FILES.PRODUCTS}`
+
+  // Local storage utilities
+  const { loadWithTTL, saveWithTimestamp } = useStorage()
+
+  const cacheProducts = () => {
+    try {
+      const payload = products.value.map(product => product.toJSON())
+      saveWithTimestamp(STORAGE_KEYS.PRODUCTS_CACHE, payload)
+    } catch (err) {
+      console.warn('Failed to cache products to localStorage', err)
+    }
+  }
   
   // Actions
   const initializeProducts = async () => {
@@ -39,6 +54,13 @@ export const useProductsStore = defineStore('products', () => {
   
   const loadProducts = async () => {
     try {
+      // キャッシュを優先
+      const cached = loadWithTTL(STORAGE_KEYS.PRODUCTS_CACHE, PRODUCTS_CACHE_TTL)
+      if (cached && Array.isArray(cached)) {
+        products.value = cached.map(productData => Product.fromData(productData))
+        return
+      }
+
       const authStore = useAuthStore()
       const token = authStore.getAccessToken()
       
@@ -72,8 +94,10 @@ export const useProductsStore = defineStore('products', () => {
           }
         }
         products.value = parsedProducts
+        cacheProducts()
       } else {
         products.value = []
+        cacheProducts()
       }
       
     } catch (err) {
@@ -120,6 +144,7 @@ export const useProductsStore = defineStore('products', () => {
       
       // ファイルを更新
       await saveProductsToFile(token)
+      cacheProducts()
       
       return newProduct
       
@@ -201,6 +226,7 @@ export const useProductsStore = defineStore('products', () => {
       
       // ファイルを更新
       await saveProductsToFile(token)
+      cacheProducts()
       
       return createdProducts
       
@@ -256,6 +282,7 @@ export const useProductsStore = defineStore('products', () => {
       
       // ファイルを更新
       await saveProductsToFile(token)
+      cacheProducts()
       
       return updatedProduct
       
@@ -294,6 +321,7 @@ export const useProductsStore = defineStore('products', () => {
       
       // ファイルを更新
       await saveProductsToFile(token)
+      cacheProducts()
       
     } catch (err) {
       console.error('Failed to delete product:', err)

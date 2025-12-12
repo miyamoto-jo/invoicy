@@ -1,13 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
-import { APP_CONFIG } from '../config/api.js'
+import { APP_CONFIG, STORAGE_KEYS } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
 import { Sale } from '../models/Sale.js'
 import { SaleLine } from '../models/SaleLine.js'
 import { SaleTotals } from '../models/SaleTotals.js'
+import { useStorage } from '../composables/useStorage.js'
 
 export const useSalesStore = defineStore('sales', () => {
+  const SALES_CACHE_TTL = 10 * 60 * 1000 // 10分
+
   // State
   const sales = ref([])
   const isLoading = ref(false)
@@ -24,6 +27,41 @@ export const useSalesStore = defineStore('sales', () => {
   
   // Google Drive API設定
   const SALES_FOLDER = APP_CONFIG.SUB_FOLDERS[1] // 'sales'
+
+  // Local storage utilities
+  const { loadWithTTL, saveWithTimestamp, loadFromLocalStorage } = useStorage()
+
+  const cacheSales = (targetSales = sales.value) => {
+    try {
+      const payload = targetSales.map(sale => (sale.toJSON ? sale.toJSON() : sale))
+      saveWithTimestamp(STORAGE_KEYS.SALES_CACHE, payload)
+    } catch (err) {
+      console.warn('Failed to cache sales to localStorage', err)
+    }
+  }
+
+  const mergeSalesCache = (newSales) => {
+    try {
+      const cachedRaw = loadFromLocalStorage(STORAGE_KEYS.SALES_CACHE)
+      const existing = Array.isArray(cachedRaw?.data)
+        ? cachedRaw.data
+        : Array.isArray(cachedRaw)
+          ? cachedRaw
+          : []
+      const mergedMap = new Map()
+      existing.forEach(item => {
+        if (item?.id) mergedMap.set(item.id, item)
+      })
+      newSales.forEach(item => {
+        const data = item?.toJSON ? item.toJSON() : item
+        if (data?.id) mergedMap.set(data.id, data)
+      })
+      const merged = Array.from(mergedMap.values())
+      saveWithTimestamp(STORAGE_KEYS.SALES_CACHE, merged)
+    } catch (err) {
+      console.warn('Failed to merge sales cache', err)
+    }
+  }
   
   // Actions
   const initializeSales = async () => {
@@ -41,6 +79,13 @@ export const useSalesStore = defineStore('sales', () => {
   
   const loadSales = async () => {
     try {
+      // キャッシュを優先
+      const cached = loadWithTTL(STORAGE_KEYS.SALES_CACHE, SALES_CACHE_TTL)
+      if (cached && Array.isArray(cached)) {
+        sales.value = cached.map(saleData => Sale.fromData(saleData))
+        return
+      }
+
       const authStore = useAuthStore()
       const token = authStore.getAccessToken()
       
@@ -83,8 +128,10 @@ export const useSalesStore = defineStore('sales', () => {
           }
         }
         sales.value = salesData
+        cacheSales()
       } else {
         sales.value = []
+        cacheSales()
       }
       
     } catch (err) {
@@ -97,6 +144,18 @@ export const useSalesStore = defineStore('sales', () => {
     try {
       isLoading.value = true
       error.value = null
+      
+      // キャッシュから該当月を優先取得
+      const cached = loadWithTTL(STORAGE_KEYS.SALES_CACHE, SALES_CACHE_TTL)
+      if (cached && Array.isArray(cached)) {
+        const filtered = cached
+          .filter(sale => sale.issuedOn && sale.issuedOn.startsWith(`${yearMonth}-`))
+          .map(saleData => Sale.fromData(saleData))
+        if (filtered.length > 0) {
+          filtered.sort((a, b) => new Date(b.issuedOn) - new Date(a.issuedOn))
+          return filtered
+        }
+      }
       
       const authStore = useAuthStore()
       const token = authStore.getAccessToken()
@@ -145,6 +204,7 @@ export const useSalesStore = defineStore('sales', () => {
         
         // issuedOnが新しい順でソート
         salesData.sort((a, b) => new Date(b.issuedOn) - new Date(a.issuedOn))
+        mergeSalesCache(salesData)
         
         return salesData
       } else {
@@ -227,6 +287,7 @@ export const useSalesStore = defineStore('sales', () => {
       
       // ローカルの状態を更新
       sales.value.unshift(newSale)
+      mergeSalesCache([newSale])
       
       return newSale
       
@@ -315,10 +376,13 @@ export const useSalesStore = defineStore('sales', () => {
       
       // ローカルの状態を更新（新しく作成された売上を追加）
       // JSON形式からSaleインスタンスに変換
+      const allNewSales = []
       for (const monthSales of Object.values(salesByMonth)) {
         const saleInstances = monthSales.map(saleData => Sale.fromData(saleData))
         sales.value.unshift(...saleInstances)
+        allNewSales.push(...saleInstances)
       }
+      mergeSalesCache(allNewSales)
       
       return salesDataArray.length
       
@@ -485,6 +549,7 @@ export const useSalesStore = defineStore('sales', () => {
         if (index !== -1) {
           sales.value.splice(index, 1)
         }
+        cacheSales()
       }
       
     } catch (err) {

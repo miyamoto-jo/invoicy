@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
-import { APP_CONFIG } from '../config/api.js'
+import { APP_CONFIG, STORAGE_KEYS } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
 import { Customer } from '../models/Customer.js'
+import { useStorage } from '../composables/useStorage.js'
 
 export const useCustomersStore = defineStore('customers', () => {
+  const CUSTOMERS_CACHE_TTL = 10 * 60 * 1000 // 10分
+
   // State
   const customers = ref([])
   const isLoading = ref(false)
@@ -22,6 +25,18 @@ export const useCustomersStore = defineStore('customers', () => {
   
   // Google Drive API設定
   const CUSTOMERS_FILE = `masters/${APP_CONFIG.FILES.CUSTOMERS}`
+
+  // Local storage utilities
+  const { loadWithTTL, saveWithTimestamp } = useStorage()
+
+  const cacheCustomers = () => {
+    try {
+      const payload = customers.value.map(customer => customer.toJSON())
+      saveWithTimestamp(STORAGE_KEYS.CUSTOMERS_CACHE, payload)
+    } catch (err) {
+      console.warn('Failed to cache customers to localStorage', err)
+    }
+  }
   
   // Actions
   const initializeCustomers = async () => {
@@ -39,6 +54,13 @@ export const useCustomersStore = defineStore('customers', () => {
   
   const loadCustomers = async () => {
     try {
+      // キャッシュを優先
+      const cached = loadWithTTL(STORAGE_KEYS.CUSTOMERS_CACHE, CUSTOMERS_CACHE_TTL)
+      if (cached && Array.isArray(cached)) {
+        customers.value = cached.map(customerData => Customer.fromData(customerData))
+        return
+      }
+
       const authStore = useAuthStore()
       const token = authStore.getAccessToken()
       
@@ -72,9 +94,11 @@ export const useCustomersStore = defineStore('customers', () => {
           }
         }
         customers.value = parsedCustomers
+        cacheCustomers()
         
       } else {
         customers.value = []
+        cacheCustomers()
       }
       
     } catch (err) {
@@ -122,6 +146,7 @@ export const useCustomersStore = defineStore('customers', () => {
       
       // ファイルを更新
       await saveCustomersToFile(token)
+      cacheCustomers()
       
       console.log('Customer created successfully:', newCustomer.toJSON())
       
@@ -210,6 +235,7 @@ export const useCustomersStore = defineStore('customers', () => {
       
       // ファイルを更新
       await saveCustomersToFile(token)
+      cacheCustomers()
       
       return createdCustomers
       
@@ -264,6 +290,7 @@ export const useCustomersStore = defineStore('customers', () => {
       
       // ファイルを更新
       await saveCustomersToFile(token)
+      cacheCustomers()
       
       console.log('Customer updated successfully:', updatedCustomer.toJSON())
       
@@ -301,6 +328,7 @@ export const useCustomersStore = defineStore('customers', () => {
       
       // ファイルを更新
       await saveCustomersToFile(token)
+      cacheCustomers()
       
       console.log('Customer deleted successfully')
       

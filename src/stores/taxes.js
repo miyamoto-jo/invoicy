@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
-import { APP_CONFIG } from '../config/api.js'
+import { APP_CONFIG, STORAGE_KEYS } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
 import { Tax } from '../models/Tax.js'
+import { useStorage } from '../composables/useStorage.js'
 
 export const useTaxesStore = defineStore('taxes', () => {
+  const TAXES_CACHE_TTL = 10 * 60 * 1000 // 10分
+
   // State
   const taxes = ref([])
   const isLoading = ref(false)
@@ -29,6 +32,41 @@ export const useTaxesStore = defineStore('taxes', () => {
   
   // Google Drive API設定
   const TAXES_FILE = `masters/${APP_CONFIG.FILES.TAXES}`
+
+  // Local storage utilities
+  const { loadWithTTL, saveWithTimestamp } = useStorage()
+
+  const cacheTaxes = () => {
+    try {
+      const payload = {
+        taxes: taxes.value.map(tax => tax.toJSON()),
+        rounding: rounding.value,
+        defaultTaxId: defaultTaxId.value
+      }
+      saveWithTimestamp(STORAGE_KEYS.TAXES_CACHE, payload)
+    } catch (err) {
+      console.warn('Failed to cache taxes to localStorage', err)
+    }
+  }
+
+  const applyTaxesContent = (content) => {
+    if (content && typeof content === 'object' && !Array.isArray(content)) {
+      // オブジェクト形式の場合（新しい形式）
+      rounding.value = content.rounding || 'floor'
+      defaultTaxId.value = content.default_tax_id || 'tax_10'
+      taxes.value = (content.taxes || []).map(taxData => Tax.fromData(taxData))
+    } else if (content && Array.isArray(content)) {
+      // 配列形式の場合（古い形式）
+      taxes.value = content.map(taxData => Tax.fromData(taxData))
+      rounding.value = 'floor'
+      defaultTaxId.value = 'tax_10'
+    } else {
+      // ファイルが空の場合
+      taxes.value = []
+      rounding.value = 'floor'
+      defaultTaxId.value = 'tax_10'
+    }
+  }
   
   // Actions
   const initializeTaxes = async () => {
@@ -46,6 +84,13 @@ export const useTaxesStore = defineStore('taxes', () => {
   
   const loadTaxes = async () => {
     try {
+      // キャッシュを優先
+      const cached = loadWithTTL(STORAGE_KEYS.TAXES_CACHE, TAXES_CACHE_TTL)
+      if (cached) {
+        applyTaxesContent(cached)
+        return
+      }
+
       const authStore = useAuthStore()
       const token = authStore.getAccessToken()
       
@@ -61,15 +106,8 @@ export const useTaxesStore = defineStore('taxes', () => {
       
       // ファイルの内容を取得
       const content = await googleApiClient.getFileContent(token, taxesFile.id)
-      
-      if (content && Array.isArray(content)) {
-        taxes.value = content
-      } else {
-        taxes.value = []
-      }
-      
-      // taxes.jsonからroundingとdefault_tax_idを読み込み
-      await loadTaxSettingsFromTaxesFile(token, appFolder.id)
+      applyTaxesContent(content)
+      cacheTaxes()
       
     } catch (err) {
       console.error('Failed to load taxes:', err)
@@ -113,6 +151,7 @@ export const useTaxesStore = defineStore('taxes', () => {
       
       // ファイルを更新
       await saveTaxesToFile(token)
+      cacheTaxes()
       
       return newTax
       
@@ -164,6 +203,7 @@ export const useTaxesStore = defineStore('taxes', () => {
       
       // ファイルを更新
       await saveTaxesToFile(token)
+      cacheTaxes()
       
       return updatedTax
       
@@ -199,6 +239,7 @@ export const useTaxesStore = defineStore('taxes', () => {
       
       // ファイルを更新
       await saveTaxesToFile(token)
+      cacheTaxes()
       
     } catch (err) {
       console.error('Failed to delete tax:', err)
@@ -326,42 +367,10 @@ export const useTaxesStore = defineStore('taxes', () => {
       }
       
       await googleApiClient.updateFileContent(token, taxesFile.id, taxesData)
+      cacheTaxes()
     } catch (err) {
       console.error('Failed to save taxes to file:', err)
       throw err
-    }
-  }
-  
-  // 税率設定の読み込み（taxes.jsonから）
-  const loadTaxSettingsFromTaxesFile = async (token, appFolderId) => {
-    try {
-      // taxes.jsonファイルを取得
-      const taxesFile = await getOrCreateTaxesFile(token, appFolderId)
-      const content = await googleApiClient.getFileContent(token, taxesFile.id)
-      
-      if (content && typeof content === 'object' && !Array.isArray(content)) {
-        // オブジェクト形式の場合（新しい形式）
-        rounding.value = content.rounding || 'floor'
-        defaultTaxId.value = content.default_tax_id || 'tax_10'
-        // Taxインスタンスに変換
-        taxes.value = (content.taxes || []).map(taxData => Tax.fromData(taxData))
-      } else if (content && Array.isArray(content)) {
-        // 配列形式の場合（古い形式）
-        taxes.value = content.map(taxData => Tax.fromData(taxData))
-        rounding.value = 'floor'
-        defaultTaxId.value = 'tax_10'
-      } else {
-        // ファイルが空の場合
-        taxes.value = []
-        rounding.value = 'floor'
-        defaultTaxId.value = 'tax_10'
-      }
-    } catch (err) {
-      console.error('Failed to load tax settings from taxes file:', err)
-      // エラーの場合はデフォルト値を使用
-      taxes.value = []
-      rounding.value = 'floor'
-      defaultTaxId.value = 'tax_10'
     }
   }
   
@@ -396,6 +405,7 @@ export const useTaxesStore = defineStore('taxes', () => {
       // ローカル状態を更新
       rounding.value = newRounding
       defaultTaxId.value = newDefaultTaxId
+      cacheTaxes()
       
     } catch (err) {
       console.error('Failed to update tax settings:', err)

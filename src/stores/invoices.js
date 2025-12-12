@@ -1,13 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
-import { APP_CONFIG } from '../config/api.js'
+import { APP_CONFIG, STORAGE_KEYS } from '../config/api.js'
 import { googleApiClient } from '../services/googleApi.js'
 import { Invoice } from '../models/Invoice.js'
 import { InvoiceDetail } from '../models/InvoiceDetail.js'
 import { InvoiceSummary } from '../models/InvoiceSummary.js'
+import { useStorage } from '../composables/useStorage.js'
 
 export const useInvoicesStore = defineStore('invoices', () => {
+  const INVOICES_CACHE_TTL = 10 * 60 * 1000 // 10分
+
   // State
   const invoices = ref([])
   const isLoading = ref(false)
@@ -17,6 +20,33 @@ export const useInvoicesStore = defineStore('invoices', () => {
   const invoicesByYear = ref(new Map())
   // 現在キャッシュされている年
   const cachedYear = ref(null)
+  
+  // Local storage utilities
+  const { loadWithTTL, saveWithTimestamp, loadFromLocalStorage } = useStorage()
+
+  const saveInvoicesCache = () => {
+    try {
+      const payload = {}
+      invoicesByYear.value.forEach((invoiceList, year) => {
+        payload[year] = invoiceList.map(inv => (inv.toJSON ? inv.toJSON() : inv))
+      })
+      saveWithTimestamp(STORAGE_KEYS.INVOICES_CACHE, payload)
+    } catch (err) {
+      console.warn('Failed to cache invoices to localStorage', err)
+    }
+  }
+
+  const loadCachedInvoicesForYear = (year) => {
+    const cached = loadWithTTL(STORAGE_KEYS.INVOICES_CACHE, INVOICES_CACHE_TTL)
+    if (cached && cached[year]) {
+      const invoiceInstances = cached[year].map(invoiceData => Invoice.fromData(invoiceData))
+      invoicesByYear.value.set(year, invoiceInstances)
+      cachedYear.value = year
+      invoices.value = invoiceInstances
+      return true
+    }
+    return false
+  }
   
   // Computed
   const invoicesCount = computed(() => invoices.value.length)
@@ -55,6 +85,14 @@ export const useInvoicesStore = defineStore('invoices', () => {
       
       // 年が指定されていない場合は現在の年を使用
       const year = targetYear || new Date().getFullYear()
+      
+      // ローカルキャッシュを優先
+      if (!forceRefresh) {
+        const usedCache = loadCachedInvoicesForYear(year)
+        if (usedCache) {
+          return
+        }
+      }
       
       // キャッシュに既にその年のデータがある場合はそれを使用（強制再取得でない場合）
       if (!forceRefresh && cachedYear.value === year && invoicesByYear.value.has(year)) {
@@ -102,6 +140,7 @@ export const useInvoicesStore = defineStore('invoices', () => {
         invoicesByYear.value.set(year, invoicesData)
         cachedYear.value = year
         invoices.value = invoicesData
+        saveInvoicesCache()
         
         console.log(`✅ Loaded ${invoicesData.length} invoices for year ${year}`)
       } else {
@@ -109,6 +148,7 @@ export const useInvoicesStore = defineStore('invoices', () => {
         invoicesByYear.value.set(year, [])
         cachedYear.value = year
         invoices.value = []
+        saveInvoicesCache()
       }
       
     } catch (err) {
@@ -191,6 +231,8 @@ export const useInvoicesStore = defineStore('invoices', () => {
         }
         invoicesByYear.value.set(cachedYear.value, cachedInvoices)
       }
+      
+      saveInvoicesCache()
       
       return newInvoice
       
@@ -305,6 +347,8 @@ export const useInvoicesStore = defineStore('invoices', () => {
         }
         invoicesByYear.value.set(cachedYear.value, cachedInvoices)
       }
+      
+      saveInvoicesCache()
       
       return invoicesDataArray.length
       
@@ -616,6 +660,7 @@ export const useInvoicesStore = defineStore('invoices', () => {
           invoicesByYear.value.set(cachedYear.value, cachedInvoices)
         }
       }
+      saveInvoicesCache()
       
       // 現在表示されている年の最新データをGoogleドライブから取得
       // パフォーマンスに注意：キャッシュされている年と同じ年の場合のみ再取得

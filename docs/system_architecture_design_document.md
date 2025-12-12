@@ -1,4 +1,4 @@
-# Invoicy システム基本設計（ベース版）
+# Invoicy システム基本設計
 
 > 本設計は、提示された要件定義（最新版）を前提にした**最小構成の基本設計**です。詳細設計（画面遷移・UI・アルゴリズム詳細）は別途。バックエンドは構築せず、**オンライン前提**で Google Drive に即時保存します。
 
@@ -9,22 +9,39 @@
 - **クライアントのみの Web アプリ（PWA／GitHub Pages 配布）**
 - **外部サービス**：Google Identity Services（OAuth 2.0 + PKCE）、Google Drive API
 - **データ保存**：ユーザーの Google Drive 上に**アプリ専用フォルダ**を作成し、各データを**ファイルとして即時アップロード**
-- **対象機能**：顧客マスター／商品マスター／消費税マスターの CRUD、売上登録・閲覧、請求書作成（複数顧客対応、期間集計）
+- **対象機能**：
+  - 顧客マスター／商品マスター／消費税マスターの CRUD、一括登録
+  - 売上登録（ローカルメモリ保存→一括反映）・閲覧・分析
+  - 請求書作成（複数顧客対応、期間集計）・閲覧・分析・PDF出力
+  - データ削除機能
 
 ### 1.1 コンポーネント構成
 
-- **UI 層**：SPA（ルーティング：`/customers`, `/products`, `/taxes`, `/sales`, `/invoices`）
-- **アプリ層**：ドメインロジック（ID 採番、集計、バリデーション）
-- **インフラ層**：認証（GIS）／Google Drive クライアント（CRUD, 検索, フォルダ管理）
+- **UI 層**：SPA（Vue 3 + Vue Router、ハッシュルーティング）
+  - ルーティング：`/dashboard`, `/customers`, `/products`, `/taxes`, `/sales`, `/invoices`, `/data-deletion`等
+  - コンポーネント：フォーム、一覧、分析、PDF出力モーダル等
+- **アプリ層**：
+  - 状態管理：Piniaストア（auth, setting, customers, products, taxes, sales, invoices）
+  - ドメインモデル：Customer, Product, Sale, Invoice等のクラス実装
+  - ドメインロジック：ID 採番、集計、バリデーション、税額計算
+- **インフラ層**：
+  - 認証：Google Identity Services（GIS）、トークン管理・リフレッシュ
+  - Google Drive クライアント：GoogleApiClientクラス（CRUD, 検索, フォルダ管理）
+  - ストレージ：ローカルストレージ（キャッシュ）、セッションストレージ（トークン）
 
 ---
 
 ## 2. 外部連携（認証・権限）
 
 - **認証**：Google Identity Services の Authorization Code Flow（PKCE）
-- **スコープ**：`openid email profile` + `https://www.googleapis.com/auth/drive.file`
+- **スコープ**：`openid email profile` + `https://www.googleapis.com/auth/drive.file` + `https://www.googleapis.com/auth/drive.metadata.readonly`
   - `drive.file` により**アプリが作成・開いたファイルのみ**アクセス可能
-- **トークン管理**：ブラウザ実行時は**短期トークンを必要時に再取得**（リフレッシュトークン非前提）
+  - `drive.metadata.readonly` によりファイル検索・メタデータ取得が可能
+- **トークン管理**：
+  - ブラウザ実行時は**短期トークンを必要時に再取得**（リフレッシュトークン非前提）
+  - トークンは`sessionStorage`に保存
+  - 401エラー発生時は自動的にトークンをリフレッシュして再試行（最大1回）
+  - トークン有効期限情報の取得・表示機能を実装
 - **サインアウト**：アプリ側セッションを破棄し、必要時に再認証
 
 ---
@@ -43,8 +60,9 @@
     - 月次台帳（1ヶ月分の伝票） = 1 ファイル（`ledger-YYYYMM.jsonl`）
       - 1行 = 伝票情報
   - `invoices/`
-    - 月次台帳（1ヶ月分の請求書） = 1 ファイル（`invoices-YYYYMM.jsonl`）
+    - 月次台帳（1ヶ月分の請求書） = 1 ファイル（`YYYY-MM-invoices.jsonl`）
       - 1行 = 1顧客の請求書情報
+      - 例：`2025-01-invoices.jsonl`（2025年1月分の請求書）
 
 > 単一ユーザー運用を想定し、**マスターデータは1ファイルで管理**、**伝票・請求書はレコード単位ファイル**方式を採用。マスター検索はファイル全体を取得してクライアント側でフィルタ。
 > 
@@ -114,11 +132,22 @@
 {"id": "tkt_...", "customerId": "cus_...", "issuedOn": "2025-08-30", "lines": [{"productId": "prd_...", "productName": "商品B", "alias": "商品管理用名称", "quantity": 1, "priceExclTax": 300, "taxRate": 10}], "note": "", "totals": {"taxByRate": {"10": 30, "8": 0}, "totalInclTax": 330}, "isNegative": false, "negatesTicketId": null, "createdAt": "2025-08-16T12:34:56+09:00"}}
 ```
 
-**請求書（invoices/invoices-YYYYMM.jsonl）**
+**請求書（invoices/YYYY-MM-invoices.jsonl）**
 
 ```jsonl
-{"id": "inv_...", "customerId": "cus_...", "period": {"from": "2025-08-01", "to": "2025-08-31"}, "ticketIds": ["tkt_..."], "summary": {"subtotalExclTax": 1000, "taxByRate": {"10": 100, "8": 0}, "totalInclTax": 1100}, "createdAt": "..."}
+{"id": "inv_...", "customerId": "cus_...", "customerName": "顧客名称", "period": "2025年8月分", "closingDay": "末日", "paymentMethod": "振込", "summary": {"subtotalExclTax": 1000, "taxByRate": {"10": 100, "8": 0}, "totalTax": 100, "totalInclTax": 1100}, "details": [{"orderDate": "2025-08-15", "productName": "商品A", "quantity": 2, "unitPriceExclTax": 250, "taxRate": 10, "subtotalExclTax": 500}], "createdAt": "2025-08-16T12:34:56+09:00"}
 ```
+
+> **請求書の構造**：
+> - `id`: 請求書ID（顧客IDと期間から生成される固定ID）
+> - `customerId`: 顧客ID
+> - `customerName`: 顧客名
+> - `period`: 対象期間（例："2025年8月分"）
+> - `closingDay`: 締め日（1-31または"末日"）
+> - `paymentMethod`: 支払方法（"振込"または"現金"）
+> - `summary`: 集計情報（税抜合計、税率別税額、税額合計、税込合計）
+> - `details`: 明細配列（注文日、商品名、数量、単価、税率、小計）
+> - `createdAt`: 作成日時（JST形式）
 
 ---
 
@@ -312,10 +341,11 @@
    - 請求書データのバリデーション
 
 6. **ファイル保存**
-   - `invoices/`フォルダに`invoices-YYYYMM.jsonl`ファイルを作成
+   - `invoices/`フォルダに`YYYY-MM-invoices.jsonl`ファイルを作成（例：`2025-01-invoices.jsonl`）
    - 各顧客の請求書データを1行ずつJSONL形式で保存
    - 既存ファイルがある場合は追記、ない場合は新規作成
    - `files.update`または`files.create`でファイル保存
+   - 請求書IDは顧客IDと期間から固定IDを生成（`generateInvoiceId`）
 
 7. **完了処理**
    - 成功メッセージ表示
@@ -334,13 +364,20 @@
 
 ## 5. 画面（概要）
 
-- **Dashboard**：メイン画面、事業者設定編集ボタン配置
+- **Dashboard**：メイン画面、事業者設定編集ボタン配置、Google Drive容量情報表示
 - **BusinessSettings**：事業者設定作成・編集画面
-- **Customers**：一覧／検索／新規／編集／削除
-- **Products**：一覧／新規／編集／削除（価格＝税抜）
+- **Customers**：一覧／検索／新規／編集／削除／一括登録（CSV）
+- **Products**：一覧／新規／編集／削除（価格＝税抜）／一括登録
 - **Taxes**：一覧／登録／削除（単純な率の管理）
-- **Sales**：登録（伝票作成）／一覧（期間・顧客・商品フィルタ）
-- **Invoices**：作成（期間×複数顧客）／一覧（期間・顧客フィルタ）
+- **Sales**：
+  - 登録（伝票作成）：ローカルメモリ保存→一括反映
+  - 一覧（期間・顧客・商品フィルタ）
+  - 分析（売上分析画面）
+- **Invoices**：
+  - 作成（期間×複数顧客）
+  - 一覧（期間・顧客フィルタ）
+  - 分析（請求書分析画面）
+- **DataDeletion**：データ削除画面（売上データ・請求書データの削除）
 
 ---
 
@@ -358,18 +395,35 @@
 ## 7. エラーハンドリング
 
 - **ネットワーク**：失敗時はエラー表示＋**再試行**ボタン。オフライン時は**保存不可**のメッセージを明示。
-- **認可**：トークン失効時は再ログイン誘導（モーダル）。
+- **認可**：
+  - トークン失効時（401エラー）は自動的にトークンをリフレッシュして再試行（最大1回）
+  - リフレッシュに失敗した場合は再ログイン誘導
 - **Drive**：`403/404/429/5xx` に応じてリトライ（指数バックオフ上限 3 回）。
+- **トークン管理**：
+  - トークン有効期限情報の取得・表示機能を実装
+  - トークン検証機能により、セッション開始時に有効性を確認
 
 ---
 
 ## 8. 非機能（最小）
 
 - 対応ブラウザ：iOS Safari（最新）、Android Chrome（最新）、デスクトップ最新版（動作確認用）
-- セキュリティ：HTTPS（GitHub Pages）必須、OAuth は PKCE、トークンは**メモリ or sessionStorage**で短期保持
-- パフォーマンス：一覧は**必要ページのみページング**、Drive への API はバックオフ制御
-- ルーティング：**ハッシュルーティング**で 404 回避（`/#/customers` など）
-- PWA：Service Worker は**最小（App Shell 程度）**。API レスポンスはキャッシュしない（オンライン前提）。
+- セキュリティ：
+  - HTTPS（GitHub Pages）必須
+  - OAuth は PKCE
+  - トークンは**sessionStorage**で短期保持
+  - ローカルストレージにフォルダIDやキャッシュデータを保存（機密情報は含まない）
+- パフォーマンス：
+  - 一覧は**必要ページのみページング**
+  - Drive への API はバックオフ制御
+  - 請求書データは年単位でキャッシュ（`invoicesByYear`）
+  - ローカルストレージにマスターデータや設定をキャッシュ
+- ルーティング：**ハッシュルーティング**（`createWebHashHistory`）で 404 回避（`/#/customers` など）
+- PWA：
+  - Service Worker は**最小（App Shell 程度）**
+  - API レスポンスはキャッシュしない（オンライン前提）
+  - `manifest.webmanifest`でPWA設定を定義
+  - アイコンは192px/512pxを用意
 - 監査：操作ログ（クライアント内のメモリ/コンソール）— 個人利用のため外部送信なし
 
 ---
@@ -377,13 +431,25 @@
 ## 9. リポジトリと設定（参考）
 
 - `README` に前提（オンライン必須、Drive 保存、PWA配布）を明記
-- `.env`（ビルド時埋め込み）：`GOOGLE_CLIENT_ID`、`APP_FOLDER_NAME=Invoicy`
+- `.env`（ビルド時埋め込み）：
+  - `VITE_GOOGLE_CLIENT_ID`：Google OAuth クライアントID
+  - `VITE_APP_FOLDER_NAME=Invoicy`：アプリフォルダ名（デフォルト）
+  - `VITE_GOOGLE_API_BASE`：Google API ベースURL（デフォルト：`https://www.googleapis.com`）
+- **Vite設定**：
+  - `base: '/invoicy/'`：GitHub Pages用のベースパス
+  - `createWebHashHistory`：ハッシュルーティングを使用
 - **GitHub Pages**：`main` → Pages（ビルド出力を `/dist` に配置）
-- **ルーティング**：\*\*ハッシュルーティング（#/）\*\*を推奨（Pages は SPA のパス直叩きで 404 になるため）
+- **ルーティング**：\*\*ハッシュルーティング（#/）\*\*を使用（Pages は SPA のパス直叩きで 404 になるため）
 - **OAuth 設定**：
   - Authorized JavaScript origins：`https://<your-username>.github.io`
   - Authorized redirect URIs：`https://<your-username>.github.io/invoicy/auth/callback`
 - ビルド/配布：静的ホスティング（GitHub Pages / Actions で自動デプロイ）
+- **依存関係**：
+  - Vue 3.4.0
+  - Vue Router 4.2.5
+  - Pinia 2.1.7（状態管理）
+  - Chart.js 4.5.1 / vue-chartjs 5.3.3（分析画面用）
+  - jsPDF 3.0.3 / html2canvas 1.4.1（PDF出力用）
 
 ---
 
@@ -393,10 +459,16 @@
 
 - 初回ログイン時に事業者設定作成画面が表示され、設定が Drive 上で保存される
 - ダッシュボードから事業者設定編集画面に遷移できる
+- ダッシュボードにGoogle Drive容量情報が表示される
 - 顧客/商品/税率マスターの CRUD が Drive 上で反映される
-- 売上登録が Drive に 1 伝票 = 1 ファイルとして保存される
+- 顧客/商品マスターの一括登録機能が動作する
+- 売上登録がローカルメモリに保存され、一括反映で Drive に月次ファイルとして保存される
 - 売上閲覧で期間・顧客・商品フィルタが機能する
-- 請求書作成で、期間×複数顧客に対し請求書ファイルが作成される
+- 売上分析画面で売上データの分析が可能
+- 請求書作成で、期間×複数顧客に対し請求書ファイル（`YYYY-MM-invoices.jsonl`）が作成される
+- 請求書閲覧で期間・顧客フィルタが機能する
+- 請求書分析画面で請求書データの分析が可能
+- データ削除画面で売上データ・請求書データの削除が可能
 
 ---
 
@@ -406,14 +478,17 @@
 
 - `public/manifest.webmanifest`
   - `name: "Invoicy"`, `short_name: "Invoicy"`, `start_url: "/invoicy/"`, `scope: "/invoicy/"`
-  - `display: "standalone"`, `theme_color`, `background_color`
+  - `display: "standalone"`, `theme_color: "#4285f4"`, `background_color: "#ffffff"`
+  - `orientation: "portrait-primary"`
   - `icons`: 192/512px（`purpose: "any maskable"` を含む）
 - `public/service-worker.js`
   - 役割：**App Shell（HTML/CSS/JS）だけ**を `install` 時にキャッシュ
-  - 取得戦略：**network-first**（API は常にネット経由）
+  - 取得戦略：**cache-first**（キャッシュがあれば使用、なければネットワーク）
+  - API レスポンスはキャッシュしない（オンライン前提）
 - `index.html`
   - `<link rel="manifest" href="/invoicy/manifest.webmanifest">`
   - iOS 向け `<meta name="apple-mobile-web-app-capable" content="yes">`、`apple-touch-icon`
+  - Google Identity Services のスクリプト読み込み
 
 ### 11.2 デプロイ手順（例）
 
@@ -429,7 +504,49 @@
 
 ---
 
+## 付記：実装済み機能
+
+### 追加実装された機能
+
+1. **データ削除機能**
+   - 売上データ・請求書データの削除画面を実装
+   - 月次ファイル単位での削除が可能
+   - 削除前に確認ダイアログを表示
+
+2. **分析機能**
+   - 売上分析画面：売上データの集計・グラフ表示
+   - 請求書分析画面：請求書データの集計・グラフ表示
+   - Chart.jsを使用した可視化
+
+3. **PDF出力機能**
+   - 請求書のPDF出力機能（jsPDF + html2canvas）
+   - PDFエクスポートモーダルを実装
+
+4. **ローカルストレージキャッシュ**
+   - マスターデータ（顧客・商品・税率）のキャッシュ
+   - 事業者設定のキャッシュ
+   - ユーザー情報のキャッシュ
+   - フォルダIDのキャッシュ
+
+5. **トークン管理の強化**
+   - トークン有効期限情報の取得・表示
+   - 自動トークンリフレッシュ機能
+   - 401エラー時の自動再試行
+
+6. **Google Drive容量情報表示**
+   - ダッシュボードに容量情報を表示
+   - 使用率の可視化
+   - 容量不足警告
+
+### 技術的な実装詳細
+
+- **状態管理**：Piniaを使用したストアパターン
+- **ドメインモデル**：各エンティティ（Customer, Product, Sale, Invoice等）をクラスとして実装
+- **API クライアント**：GoogleApiClientクラスでAPI呼び出しを抽象化
+- **エラーハンドリング**：トークン期限切れ時の自動リフレッシュ、再試行ロジック
+- **ファイル管理**：月次ファイル単位での管理、JSONL形式での保存
+
 ## 付記：未確定事項
 
-- 請求書の表現形式（JSON のみ / 将来的に HTML/PDF を追加するか）
+- 請求書の表現形式（JSON のみ / 将来的に HTML/PDF を追加するか）→ **実装済み（PDF出力機能）**
 

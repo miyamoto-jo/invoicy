@@ -133,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useCustomersStore } from '../stores/customers'
 import { useLoading } from '../composables/useLoading'
 import CustomerList from '../components/CustomerList.vue'
@@ -185,12 +185,16 @@ const showCreateForm = () => {
   selectedCustomer.value = null
 }
 
-const showEditForm = (customer) => {
+const showEditForm = async (customer) => {
   editingCustomer.value = customer
   showForm.value = true
   showBulkCreate.value = false
   showDetail.value = false
   selectedCustomer.value = null
+  
+  // スクロール位置をリセット
+  await nextTick()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 const hideForm = () => {

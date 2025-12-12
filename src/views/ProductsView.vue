@@ -77,7 +77,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useProductsStore } from '../stores/products'
 import { useCustomersStore } from '../stores/customers'
 import { useLoading } from '../composables/useLoading'
@@ -131,10 +131,14 @@ const showAddForm = () => {
   showBulkCreate.value = false
 }
 
-const showEditForm = (product) => {
+const showEditForm = async (product) => {
   editingProduct.value = product
   showForm.value = true
   showBulkCreate.value = false
+  
+  // スクロール位置をリセット
+  await nextTick()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 const hideForm = () => {

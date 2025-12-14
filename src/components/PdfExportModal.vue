@@ -121,21 +121,23 @@ const exportPdf = async () => {
     return
   }
   
+  const pdf = new jsPDF('p', 'mm', 'a4')
+  let isFirstPage = true
+  
   try {
     isExporting.value = true
     
-    // 選択された顧客の請求書を取得
-    const selectedInvoices = props.invoices.filter(invoice => 
-      selectedCustomers.value.includes(invoice.customerId)
+    const targetCustomers = availableCustomers.value.filter(c =>
+      selectedCustomers.value.includes(c.customerId)
     )
     
-    // 顧客ごとにPDFを生成
-    for (const customer of availableCustomers.value.filter(c => 
-      selectedCustomers.value.includes(c.customerId)
-    )) {
-      await generateCustomerPdf(customer)
+    for (const customer of targetCustomers) {
+      await generateCustomerPdf(customer, pdf, isFirstPage)
+      isFirstPage = false
     }
     
+    const fileName = `${props.currentPeriod.replace('月分', '月選択分')}_請求書一覧.pdf`
+    pdf.save(fileName)
     emit('close')
     
   } catch (error) {
@@ -146,7 +148,7 @@ const exportPdf = async () => {
   }
 }
 
-const generateCustomerPdf = async (customer) => {
+const generateCustomerPdf = async (customer, pdf, isFirstPageOfDocument = false) => {
   // 請求書データの集計
   let allDetails = []
   let totalAmount = 0
@@ -208,13 +210,10 @@ const generateCustomerPdf = async (customer) => {
   // 事業者設定をローカルストレージから取得
   const essentialSettings = loadFromLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS) || {}
   
-  // PDFの初期化
-  const pdf = new jsPDF('p', 'mm', 'a4')
-  
   try {
     // 1ページ目（請求書表紙）を生成
     const firstPageHtml = createFirstPageHtml(customer, year, month, totalAmount, totalTax, totalInclTax, totalSheets, essentialSettings)
-    await addPageToPdf(pdf, firstPageHtml, true) // 最初のページとして指定
+    await addPageToPdf(pdf, firstPageHtml, isFirstPageOfDocument) // ドキュメント内の最初だけページ追加を抑制
     
     // 明細ページを生成（20個ずつ）
     for (let page = 0; page < detailPages; page++) {
@@ -226,12 +225,6 @@ const generateCustomerPdf = async (customer) => {
       const detailPageHtml = createDetailPageHtml(customer, year, month, pageDetails, page, isLastPage, taxRateGroups, totalAmount, totalTax, totalInclTax)
       await addPageToPdf(pdf, detailPageHtml, false) // 明細ページとして指定
     }
-    
-    // ファイル名の生成
-    const fileName = `${props.currentPeriod}-${customer.customerName}.pdf`
-    
-    // PDFをダウンロード
-    pdf.save(fileName)
     
   } catch (error) {
     console.error('PDF generation failed:', error)

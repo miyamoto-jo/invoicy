@@ -77,7 +77,9 @@
           <div class="customer-grouping">
             <!-- 現金支払い -->
             <div v-if="Object.keys(cashGroupedCustomers).length > 0" class="payment-group">
-              <h3 class="payment-group-title">現金支払い</h3>
+              <h3 class="payment-group-title">
+                現金支払い：合計 ¥{{ formatNumber(yearlyCashTotalInclTax) }}円
+              </h3>
               <div 
                 v-for="(group, closingDay) in cashGroupedCustomers" 
                 :key="`cash-${closingDay}`"
@@ -99,7 +101,9 @@
 
             <!-- 振込支払い -->
             <div v-if="Object.keys(transferGroupedCustomers).length > 0" class="payment-group">
-              <h3 class="payment-group-title">振込支払い</h3>
+              <h3 class="payment-group-title">
+                振込支払い：合計 ¥{{ formatNumber(yearlyTransferTotalInclTax) }}円
+              </h3>
               <div 
                 v-for="(group, closingDay) in transferGroupedCustomers" 
                 :key="`transfer-${closingDay}`"
@@ -194,6 +198,13 @@
           <p>年月を選択してください</p>
         </div>
 
+        <div v-if="selectedYearMonth" class="summary-row">
+          <div class="summary-item">
+            <span class="summary-label">月間請求金額（税込）</span>
+            <span class="summary-value">¥{{ formatNumber(monthlyTotalInclTax) }}</span>
+          </div>
+        </div>
+
         <!-- 顧客分析 -->
         <div v-if="selectedYearMonth" class="customer-analysis-section">
           <h2>顧客分析</h2>
@@ -201,7 +212,9 @@
           <div class="customer-grouping">
             <!-- 現金支払い -->
             <div v-if="Object.keys(monthlyCashGroupedCustomers).length > 0" class="payment-group">
-              <h3 class="payment-group-title">現金支払い</h3>
+              <h3 class="payment-group-title">
+                現金支払い：合計 ¥{{ formatNumber(monthlyCashTotalInclTax) }}円
+              </h3>
               <div 
                 v-for="(group, closingDay) in monthlyCashGroupedCustomers" 
                 :key="`cash-${closingDay}`"
@@ -223,7 +236,9 @@
 
             <!-- 振込支払い -->
             <div v-if="Object.keys(monthlyTransferGroupedCustomers).length > 0" class="payment-group">
-              <h3 class="payment-group-title">振込支払い</h3>
+              <h3 class="payment-group-title">
+                振込支払い：合計 ¥{{ formatNumber(monthlyTransferTotalInclTax) }}円
+              </h3>
               <div 
                 v-for="(group, closingDay) in monthlyTransferGroupedCustomers" 
                 :key="`transfer-${closingDay}`"
@@ -424,6 +439,56 @@ const yearlyTotalInclTax = computed(() => {
   return inMemoryInvoices.value.reduce((sum, invoice) => {
     return sum + (invoice.summary?.totalInclTax ?? 0)
   }, 0)
+})
+
+const yearlyCashTotalInclTax = computed(() => {
+  if (selectedMode.value !== 'yearly' || inMemoryInvoices.value.length === 0) {
+    return 0
+  }
+
+  return inMemoryInvoices.value
+    .filter(inv => inv.paymentMethod === '現金')
+    .reduce((sum, invoice) => sum + (invoice.summary?.totalInclTax ?? 0), 0)
+})
+
+const yearlyTransferTotalInclTax = computed(() => {
+  if (selectedMode.value !== 'yearly' || inMemoryInvoices.value.length === 0) {
+    return 0
+  }
+
+  return inMemoryInvoices.value
+    .filter(inv => inv.paymentMethod === '振込')
+    .reduce((sum, invoice) => sum + (invoice.summary?.totalInclTax ?? 0), 0)
+})
+
+const monthlyTotalInclTax = computed(() => {
+  if (selectedMode.value !== 'monthly' || !selectedYearMonth.value || inMemoryInvoices.value.length === 0) {
+    return 0
+  }
+
+  return inMemoryInvoices.value.reduce((sum, invoice) => {
+    return sum + (invoice.summary?.totalInclTax ?? 0)
+  }, 0)
+})
+
+const monthlyCashTotalInclTax = computed(() => {
+  if (selectedMode.value !== 'monthly' || !selectedYearMonth.value || inMemoryInvoices.value.length === 0) {
+    return 0
+  }
+
+  return inMemoryInvoices.value
+    .filter(inv => inv.paymentMethod === '現金')
+    .reduce((sum, invoice) => sum + (invoice.summary?.totalInclTax ?? 0), 0)
+})
+
+const monthlyTransferTotalInclTax = computed(() => {
+  if (selectedMode.value !== 'monthly' || !selectedYearMonth.value || inMemoryInvoices.value.length === 0) {
+    return 0
+  }
+
+  return inMemoryInvoices.value
+    .filter(inv => inv.paymentMethod === '振込')
+    .reduce((sum, invoice) => sum + (invoice.summary?.totalInclTax ?? 0), 0)
 })
 
 // 現金支払いの顧客を締日ごとにグループ化

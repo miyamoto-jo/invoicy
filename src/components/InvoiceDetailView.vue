@@ -401,25 +401,26 @@ const formatTaxRate = (taxRate) => {
   
   .table-header {
     display: grid;
-    grid-template-columns: 0.9fr 1.6fr 0.5fr 0.8fr 0.8fr 0.6fr;
-    gap: 0.25rem;
-    padding: 0.5rem 0.25rem;
+    /* モバイル時は横スクロール前提で列幅をゆったり確保 */
+    grid-template-columns: 1.1fr 2fr 0.7fr 1fr 1fr 0.8fr;
+    gap: 0.5rem;
+    padding: 0.75rem 0.5rem;
     background: #f8f9fa;
     font-weight: 600;
     color: #333;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     border-bottom: 2px solid #e0e0e0;
-    min-width: 320px;
+    min-width: 420px;
   }
   
   .table-row {
     display: grid;
-    grid-template-columns: 0.9fr 1.6fr 0.5fr 0.8fr 0.8fr 0.6fr;
-    gap: 0.25rem;
-    padding: 0.5rem 0.25rem;
+    grid-template-columns: 1.1fr 2fr 0.7fr 1fr 1fr 0.8fr;
+    gap: 0.5rem;
+    padding: 0.75rem 0.5rem;
     border-bottom: 1px solid #f0f0f0;
-    font-size: 0.7rem;
-    min-width: 320px;
+    font-size: 0.8rem;
+    min-width: 420px;
   }
   
   .table-row:last-child {

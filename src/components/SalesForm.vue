@@ -1,5 +1,15 @@
 <template>
   <div class="sales-form">
+    <!-- 売上反映ボタン -->
+    <div v-if="localSales.length > 0" class="sales-reflect-section">
+      <button 
+        type="button" 
+        @click="handleReflectSales" 
+        class="btn btn-danger"
+      >
+        売上反映（{{ localSales.length }}件）
+      </button>
+    </div>
     <form @submit.prevent="handleSubmit" class="form">
       <!-- 顧客選択 -->
       <div class="form-group">
@@ -163,17 +173,6 @@
           class="btn btn-secondary"
         >
           キャンセル
-        </button>
-      </div>
-      
-      <!-- 売上反映ボタン -->
-      <div v-if="localSales.length > 0" class="sales-reflect-section">
-        <button 
-          type="button" 
-          @click="handleReflectSales" 
-          class="btn btn-danger"
-        >
-          売上反映（{{ localSales.length }}件）
         </button>
       </div>
     </form>
@@ -443,7 +442,14 @@ const validateForm = () => {
   return Object.keys(errors.value).length === 0
 }
 
+const scrollToTop = () => {
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
 const handleSubmit = async () => {
+  scrollToTop()
   try {
     if (!validateForm()) {
       return
@@ -844,7 +850,7 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 1rem;
+  margin-bottom: 1rem;
 }
 
 .btn-danger {

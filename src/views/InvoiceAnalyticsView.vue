@@ -53,11 +53,20 @@
           />
         </div>
 
+        <div class="summary-row">
+          <div class="summary-item">
+            <span class="summary-label">年間請求金額（税込）</span>
+            <span class="summary-value">¥{{ formatNumber(yearlyTotalInclTax) }}</span>
+          </div>
+        </div>
+
         <!-- グラフ分析 -->
         <div class="chart-section">
           <h2>グラフ分析</h2>
           <div class="chart-container">
-            <Line :data="yearlyChartData" :options="chartOptions" />
+            <div class="chart-inner">
+              <Line :data="yearlyChartData" :options="chartOptions" />
+            </div>
           </div>
         </div>
 
@@ -406,6 +415,16 @@ const chartOptions = computed(() => ({
     }
   }
 }))
+
+const yearlyTotalInclTax = computed(() => {
+  if (selectedMode.value !== 'yearly' || inMemoryInvoices.value.length === 0) {
+    return 0
+  }
+
+  return inMemoryInvoices.value.reduce((sum, invoice) => {
+    return sum + (invoice.summary?.totalInclTax ?? 0)
+  }, 0)
+})
 
 // 現金支払いの顧客を締日ごとにグループ化
 const cashGroupedCustomers = computed(() => {
@@ -998,6 +1017,40 @@ onMounted(() => {
 .chart-container {
   height: 400px;
   position: relative;
+  overflow-x: auto;
+}
+
+.chart-inner {
+  min-width: 800px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 1rem;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #f8f9fa;
+  min-width: 220px;
+}
+
+.summary-label {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.summary-value {
+  font-weight: 700;
+  color: #333;
+  font-size: 1.4rem;
 }
 
 .customer-analysis-section {
@@ -1144,6 +1197,11 @@ onMounted(() => {
 
   .chart-container {
     height: 300px;
+  }
+
+  .chart-inner {
+    height: 300px;
+    min-width: 700px;
   }
 
   .customer-grouping {

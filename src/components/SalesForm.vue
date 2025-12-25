@@ -61,7 +61,10 @@
             :key="product.id" 
             class="product-card"
             :class="{ 'has-items': getProductQuantity(product.id) > 0 }"
-            @click="addProductToCart(product)"
+            @pointerdown="handleProductPressStart(product)"
+            @pointerup="handleProductPressEnd(product)"
+            @pointerleave="handleProductPressCancel"
+            @pointercancel="handleProductPressCancel"
           >
             <div class="product-card-content">
               <div class="product-name">{{ product.getDisplayName() }}</div>
@@ -72,6 +75,8 @@
                 v-if="getProductQuantity(product.id) > 0"
                 type="button"
                 class="minus-btn"
+                @pointerdown.stop
+                @pointerup.stop
                 @click.stop="removeProductFromCart(product)"
               >
                 -
@@ -194,6 +199,42 @@
         </div>
       </div>
     </div>
+
+    <!-- 数量変更モーダル -->
+    <div v-if="showQuantityModal" class="modal-overlay" @click="closeQuantityModal">
+      <div class="modal-content" @click.stop>
+        <h3>数量を変更</h3>
+        <p class="modal-product-name">{{ modalProductName }}</p>
+        <div class="modal-form">
+          <label class="form-label">数量（0〜999）</label>
+          <input
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            class="form-input"
+            :value="quantityInput"
+            @input="onQuantityInputChange"
+            placeholder="0〜999の半角数字"
+          >
+          <div 
+            v-if="quantityInput !== '' && !isQuantityInputValid" 
+            class="error-message"
+          >
+            0〜999の半角数字で入力してください
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button 
+            type="button" 
+            class="btn btn-primary" 
+            :disabled="!isQuantityInputValid" 
+            @click="applyQuantityChange"
+          >
+            変更
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -240,6 +281,11 @@ const errors = ref({})
 // isReflectingは共通のローディング画面を使用するため削除
 const error = ref('')
 const showCancelDialog = ref(false)
+const showQuantityModal = ref(false)
+const quantityInput = ref('')
+const modalProduct = ref(null)
+const longPressTimer = ref(null)
+const longPressTriggered = ref(false)
 
 // ローカルメモリでの売上情報保持
 const localSales = ref([])
@@ -279,6 +325,18 @@ const defaultTaxRate = computed(() => {
   const defaultTax = taxes.value.find(tax => tax.id === defaultTaxId.value)
   console.log('Default tax lookup:', { defaultTaxId: defaultTaxId.value, defaultTax, availableTaxes: taxes.value })
   return defaultTax ? defaultTax.rate : null
+})
+
+const modalProductName = computed(() => {
+  return modalProduct.value ? modalProduct.value.getDisplayName() : ''
+})
+
+const isQuantityInputValid = computed(() => {
+  const value = quantityInput.value.trim()
+  if (value === '') return false
+  if (!/^\d{1,3}$/.test(value)) return false
+  const numericValue = Number(value)
+  return numericValue >= 0 && numericValue <= 999
 })
 
 const totals = computed(() => {
@@ -395,6 +453,33 @@ const addProductToCart = (product) => {
   }
 }
 
+const setProductQuantity = (product, quantity) => {
+  const existingItem = selectedProducts.value.find(item => item.productId === product.id)
+  const normalizedQuantity = Math.min(Math.max(quantity, 0), 999)
+
+  if (normalizedQuantity === 0) {
+    if (existingItem) {
+      const index = selectedProducts.value.findIndex(item => item.productId === product.id)
+      selectedProducts.value.splice(index, 1)
+    }
+    return
+  }
+
+  if (existingItem) {
+    existingItem.quantity = normalizedQuantity
+    existingItem.taxRate = formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+  } else {
+    selectedProducts.value.push({
+      productId: product.id,
+      productName: product.getDisplayName(),
+      alias: product.alias,
+      quantity: normalizedQuantity,
+      priceExclTax: product.priceExclTax,
+      taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+    })
+  }
+}
+
 const removeProductFromCart = (product) => {
   const existingItem = selectedProducts.value.find(item => item.productId === product.id)
   
@@ -412,6 +497,34 @@ const removeProductFromCart = (product) => {
 const getProductQuantity = (productId) => {
   const item = selectedProducts.value.find(item => item.productId === productId)
   return item ? item.quantity : 0
+}
+
+const handleProductPressStart = (product) => {
+  longPressTriggered.value = false
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+  }
+  longPressTimer.value = setTimeout(() => {
+    longPressTriggered.value = true
+    openQuantityModal(product)
+  }, 1500)
+}
+
+const handleProductPressEnd = (product) => {
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+    longPressTimer.value = null
+  }
+  if (!longPressTriggered.value) {
+    addProductToCart(product)
+  }
+}
+
+const handleProductPressCancel = () => {
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+    longPressTimer.value = null
+  }
 }
 
 const recalculateTotals = () => {
@@ -566,6 +679,31 @@ const clearForm = () => {
 // ローカルメモリの売上情報をクリアするメソッド
 const clearLocalSales = () => {
   localSales.value = []
+}
+
+const openQuantityModal = (product) => {
+  modalProduct.value = product
+  quantityInput.value = String(getProductQuantity(product.id))
+  showQuantityModal.value = true
+}
+
+const closeQuantityModal = () => {
+  showQuantityModal.value = false
+  modalProduct.value = null
+  quantityInput.value = ''
+  longPressTriggered.value = false
+}
+
+const onQuantityInputChange = (event) => {
+  // 入力値はそのまま保持し、バリデーションで判定する（非数字を入れた場合に無効化するため）
+  quantityInput.value = event.target.value.slice(0, 3)
+}
+
+const applyQuantityChange = () => {
+  if (!modalProduct.value || !isQuantityInputValid.value) return
+  const quantity = Number(quantityInput.value)
+  setProductQuantity(modalProduct.value, quantity)
+  closeQuantityModal()
 }
 
 const formatNumber = (num) => {
@@ -900,6 +1038,17 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   display: flex;
   gap: 1rem;
   justify-content: center;
+}
+
+.modal-product-name {
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.modal-form {
+  margin-bottom: 1.5rem;
+  text-align: left;
 }
 
 /* レスポンシブ対応 */

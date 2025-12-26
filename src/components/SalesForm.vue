@@ -1,7 +1,7 @@
 <template>
   <div class="sales-form">
     <!-- 売上反映ボタン -->
-    <div v-if="localSales.length > 0" class="sales-reflect-section">
+    <div v-if="!isEditMode && localSales.length > 0" class="sales-reflect-section">
       <button 
         type="button" 
         @click="handleReflectSales" 
@@ -19,6 +19,7 @@
           v-model="formData.customerId" 
           class="form-select"
           :class="{ 'error': errors.customerId }"
+          :disabled="isEditMode"
           required
         >
           <option value="">顧客を選択してください</option>
@@ -169,7 +170,7 @@
           class="btn btn-primary"
           :disabled="selectedProducts.length === 0"
         >
-          売上書込み
+          {{ isEditMode ? '更新' : '売上書込み' }}
         </button>
         
         <button 
@@ -183,7 +184,7 @@
     </form>
 
     <!-- キャンセル確認ダイアログ -->
-    <div v-if="showCancelDialog" class="modal-overlay" @click="closeCancelDialog">
+    <div v-if="!isEditMode && showCancelDialog" class="modal-overlay" @click="closeCancelDialog">
       <div class="modal-content" @click.stop>
         <h3>確認</h3>
         <p v-if="localSales.length > 0">
@@ -252,6 +253,10 @@ const props = defineProps({
   initialData: {
     type: Object,
     default: () => ({})
+  },
+  mode: {
+    type: String,
+    default: 'create'
   }
 })
 
@@ -293,6 +298,12 @@ const localSales = ref([])
 // Computed
 const customers = computed(() => customersStore.sortedCustomers)
 const products = computed(() => productsStore.sortedProducts)
+const productMap = computed(() => {
+  const map = new Map()
+  products.value.forEach(product => map.set(product.id, product))
+  return map
+})
+const isEditMode = computed(() => props.mode === 'edit')
 
 // 選択した顧客が扱える商品のみをフィルタ
 const availableProducts = computed(() => {
@@ -409,6 +420,7 @@ const initializeData = async () => {
     if (props.initialData.note) {
       formData.value.note = props.initialData.note
     }
+    populateInitialLines()
   } catch (err) {
     console.error('Failed to initialize form data:', err)
     error.value = 'データの初期化に失敗しました'
@@ -429,6 +441,31 @@ const setDefaultTaxRate = async () => {
       formData.value.invoiceTaxRate = taxes.value[0].rate
     }
   }
+}
+
+const populateInitialLines = () => {
+  if (!props.initialData.lines || props.initialData.lines.length === 0) return
+
+  if (!formData.value.invoiceTaxRate) {
+    const initialRate = props.initialData.lines[0]?.taxRate
+    if (initialRate !== undefined) {
+      formData.value.invoiceTaxRate = initialRate
+    }
+  }
+
+  selectedProducts.value = props.initialData.lines.map(line => {
+    const product = productMap.value.get(line.productId)
+    return {
+      productId: line.productId,
+      productName: line.productName || product?.getDisplayName() || '不明商品',
+      alias: line.alias || product?.alias || '',
+      quantity: line.quantity ?? 0,
+      priceExclTax: line.priceExclTax ?? product?.priceExclTax ?? 0,
+      taxRate: line.taxRate ?? formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+    }
+  })
+
+  recalculateTotals()
 }
 
 // 商品カート関連のメソッド
@@ -534,6 +571,17 @@ const recalculateTotals = () => {
   })
 }
 
+const buildLinesPayload = () => {
+  return selectedProducts.value.map(item => ({
+    productId: item.productId,
+    productName: item.productName,
+    alias: item.alias,
+    quantity: item.quantity,
+    priceExclTax: item.priceExclTax,
+    taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+  }))
+}
+
 const validateForm = () => {
   errors.value = {}
   
@@ -563,29 +611,28 @@ const scrollToTop = () => {
 
 const handleSubmit = async () => {
   scrollToTop()
+  if (!validateForm()) {
+    return
+  }
+  
+  const saleData = {
+    customerId: formData.value.customerId,
+    issuedOn: formData.value.issuedOn,
+    lines: buildLinesPayload(),
+    note: formData.value.note
+  }
+
+  // 編集モードでは即座に親へ委譲
+  if (isEditMode.value) {
+    error.value = ''
+    emit('submit', saleData)
+    return
+  }
+
   try {
-    if (!validateForm()) {
-      return
-    }
-    
     setLoading(true, '保存中...', '売上情報を保存しています')
     error.value = ''
-    
-    // 売上データの作成
-    const saleData = {
-      customerId: formData.value.customerId,
-      issuedOn: formData.value.issuedOn,
-      lines: selectedProducts.value.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        alias: item.alias,
-        quantity: item.quantity,
-        priceExclTax: item.priceExclTax,
-        taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
-      })),
-      note: formData.value.note
-    }
-    
+
     // ローカルメモリに売上情報を保存
     localSales.value.push(saleData)
     
@@ -638,6 +685,10 @@ const showToast = (message, type = 'success') => {
 }
 
 const handleCancel = () => {
+  if (isEditMode.value) {
+    emit('cancel')
+    return
+  }
   // ローカルメモリに売上情報がある場合は必ず確認ダイアログを表示
   if (localSales.value.length > 0) {
     showCancelDialog.value = true

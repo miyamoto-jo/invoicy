@@ -244,7 +244,7 @@ const formatTaxRate = (taxRate) => {
 
 .table-header {
   display: grid;
-  grid-template-columns: 1fr 2fr 0.8fr 1fr 1fr 0.8fr;
+  grid-template-columns: 1.35fr 2fr 0.8fr 1fr 1fr 0.8fr;
   gap: 1rem;
   padding: 1rem 1.5rem;
   background: #f8f9fa;
@@ -256,7 +256,7 @@ const formatTaxRate = (taxRate) => {
 
 .table-row {
   display: grid;
-  grid-template-columns: 1fr 2fr 0.8fr 1fr 1fr 0.8fr;
+  grid-template-columns: 1.35fr 2fr 0.8fr 1fr 1fr 0.8fr;
   gap: 1rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid #f0f0f0;
@@ -270,6 +270,7 @@ const formatTaxRate = (taxRate) => {
 .col-date {
   color: #666;
   font-size: 0.6rem;
+  min-width: 120px;
 }
 
 .col-product {

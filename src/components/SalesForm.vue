@@ -62,10 +62,7 @@
             :key="product.id" 
             class="product-card"
             :class="{ 'has-items': getProductQuantity(product.id) > 0 }"
-            @pointerdown="handleProductPressStart(product)"
-            @pointerup="handleProductPressEnd(product)"
-            @pointerleave="handleProductPressCancel"
-            @pointercancel="handleProductPressCancel"
+            @click="addProductToCart(product)"
           >
             <div class="product-card-content">
               <div class="product-name">{{ product.getDisplayName() }}</div>
@@ -84,7 +81,11 @@
               </button>
               
               <!-- 数量バッジ -->
-              <div v-if="getProductQuantity(product.id) > 0" class="quantity-badge">
+              <div 
+                v-if="getProductQuantity(product.id) > 0" 
+                class="quantity-badge"
+                @click.stop="openQuantityModal(product)"
+              >
                 {{ getProductQuantity(product.id) }}
               </div>
             </div>
@@ -289,8 +290,6 @@ const showCancelDialog = ref(false)
 const showQuantityModal = ref(false)
 const quantityInput = ref('')
 const modalProduct = ref(null)
-const longPressTimer = ref(null)
-const longPressTriggered = ref(false)
 
 // ローカルメモリでの売上情報保持
 const localSales = ref([])
@@ -536,34 +535,6 @@ const getProductQuantity = (productId) => {
   return item ? item.quantity : 0
 }
 
-const handleProductPressStart = (product) => {
-  longPressTriggered.value = false
-  if (longPressTimer.value) {
-    clearTimeout(longPressTimer.value)
-  }
-  longPressTimer.value = setTimeout(() => {
-    longPressTriggered.value = true
-    openQuantityModal(product)
-  }, 1500)
-}
-
-const handleProductPressEnd = (product) => {
-  if (longPressTimer.value) {
-    clearTimeout(longPressTimer.value)
-    longPressTimer.value = null
-  }
-  if (!longPressTriggered.value) {
-    addProductToCart(product)
-  }
-}
-
-const handleProductPressCancel = () => {
-  if (longPressTimer.value) {
-    clearTimeout(longPressTimer.value)
-    longPressTimer.value = null
-  }
-}
-
 const recalculateTotals = () => {
   // 選択された商品の税率を更新
   selectedProducts.value.forEach(item => {
@@ -742,7 +713,6 @@ const closeQuantityModal = () => {
   showQuantityModal.value = false
   modalProduct.value = null
   quantityInput.value = ''
-  longPressTriggered.value = false
 }
 
 const onQuantityInputChange = (event) => {

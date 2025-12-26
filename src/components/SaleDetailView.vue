@@ -5,7 +5,10 @@
       <div class="header-info">
         <div class="customer-name-row">
           <h2>{{ customerName }}</h2>
-          <button @click="openVoidModal" class="void-button">取消</button>
+          <div class="header-actions">
+            <button @click="goEdit" class="edit-button">編集</button>
+            <button @click="openVoidModal" class="void-button">取消</button>
+          </div>
         </div>
         <div class="sale-meta">
           <span class="issued-date">発行日: {{ formatDate(sale.issuedOn) }}</span>
@@ -91,6 +94,10 @@
         <span class="label">作成日時</span>
         <span class="value">{{ formatDateTime(sale.createdAt) }}</span>
       </div>
+      <div v-if="sale.updatedAt" class="created-info">
+        <span class="label">更新日時</span>
+        <span class="value">{{ formatDateTime(sale.updatedAt) }}</span>
+      </div>
     </div>
 
   </div>
@@ -98,6 +105,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useSalesStore } from '../stores/sales'
 
 const props = defineProps({
@@ -114,6 +122,7 @@ const props = defineProps({
 const emit = defineEmits(['void-success'])
 
 const salesStore = useSalesStore()
+const router = useRouter()
 
 // State
 const showVoidModal = ref(false)
@@ -169,6 +178,10 @@ const openVoidModal = () => {
   const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
   systemDate.value = jstNow.toISOString().split('T')[0]
   showVoidModal.value = true
+}
+
+const goEdit = () => {
+  router.push(`/sales/edit/${props.sale.id}`)
 }
 
 const executeVoid = async () => {
@@ -229,6 +242,28 @@ const executeVoid = async () => {
   font-weight: 600;
   flex: 1;
   min-width: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.edit-button {
+  background-color: #0d6efd;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.edit-button:hover {
+  background-color: #0b5ed7;
 }
 
 .void-button {

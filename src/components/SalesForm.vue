@@ -318,22 +318,19 @@ const availableProducts = computed(() => {
 
 const taxes = computed(() => taxesStore.sortedTaxes)
 
-// 設定からrounding値を取得
-const rounding = computed(() => {
-  return settingsStore.businessSettings?.rounding || 'floor'
-})
+// 税率設定からrounding値を取得
+const rounding = computed(() => taxesStore.rounding || 'floor')
 
-// 設定からデフォルト税率IDを取得
-const defaultTaxId = computed(() => {
-  return settingsStore.businessSettings?.default_tax_id || null
-})
+// 税率設定からデフォルト税率IDを取得（Piniaの自動アンラップをそのまま利用）
+const defaultTaxId = computed(() => taxesStore.defaultTaxId || null)
 
 // デフォルト税率を取得
 const defaultTaxRate = computed(() => {
-  if (!defaultTaxId.value || taxes.value.length === 0) return null
+  const id = defaultTaxId.value
+  if (!id || taxes.value.length === 0) return null
   
-  const defaultTax = taxes.value.find(tax => tax.id === defaultTaxId.value)
-  console.log('Default tax lookup:', { defaultTaxId: defaultTaxId.value, defaultTax, availableTaxes: taxes.value })
+  const defaultTax = taxes.value.find(tax => tax.id === id)
+  console.log('Default tax lookup:', { defaultTaxId: id, defaultTax, availableTaxes: taxes.value })
   return defaultTax ? defaultTax.rate : null
 })
 
@@ -357,24 +354,23 @@ const totals = computed(() => {
     subtotalExclTax += item.priceExclTax * item.quantity
   })
   
-  // 伝票全体の税率で消費税を計算
+  // 伝票全体の税率で消費税を計算（整数演算で丸め誤差を防ぐ）
   let taxAmount = 0
   if (formData.value.invoiceTaxRate) {
-    const rawTaxAmount = subtotalExclTax * (formData.value.invoiceTaxRate / 100)
-    
-    // rounding設定に基づいて丸め処理
+    const rawTaxScaled = subtotalExclTax * formData.value.invoiceTaxRate // 百分率を掛けた整数値
+
     switch (rounding.value) {
       case 'floor':
-        taxAmount = Math.floor(rawTaxAmount)
+        taxAmount = Math.floor(rawTaxScaled / 100)
         break
       case 'ceil':
-        taxAmount = Math.ceil(rawTaxAmount)
+        taxAmount = Math.floor((rawTaxScaled + 99) / 100)
         break
       case 'round':
-        taxAmount = Math.round(rawTaxAmount)
+        taxAmount = Math.floor((rawTaxScaled + 50) / 100)
         break
       default:
-        taxAmount = Math.floor(rawTaxAmount)
+        taxAmount = Math.floor(rawTaxScaled / 100)
     }
   }
   

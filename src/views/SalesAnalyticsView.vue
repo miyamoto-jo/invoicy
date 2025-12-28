@@ -53,11 +53,20 @@
           />
         </div>
 
+        <div class="summary-row">
+          <div class="summary-item">
+            <span class="summary-label">年間売上合計（税込）</span>
+            <span class="summary-value">¥{{ formatNumber(yearlyTotalInclTax) }}</span>
+          </div>
+        </div>
+
         <!-- グラフ分析 -->
         <div class="chart-section">
           <h2>グラフ分析</h2>
           <div class="chart-container">
-            <Line :data="yearlyChartData" :options="chartOptions" />
+            <div class="chart-inner">
+              <Line :data="yearlyChartData" :options="chartOptions" />
+            </div>
           </div>
         </div>
 
@@ -104,27 +113,35 @@
         <!-- 商品分析 -->
         <div class="product-analysis-section">
           <h2>商品分析</h2>
+          <p class="product-note">商品IDごとに集計しています。</p>
+          <div class="product-controls">
+            <label class="sort-label">
+              <span>並び替え</span>
+              <select v-model="productSortKey">
+                <option value="amount">金額</option>
+                <option value="quantity">数量</option>
+              </select>
+            </label>
+          </div>
           <div class="table-container">
             <table class="analysis-table">
               <thead>
                 <tr>
                   <th>順位</th>
-                  <th>商品ID</th>
                   <th>商品名</th>
                   <th>個数</th>
-                  <th>金額（税込）</th>
+                  <th>合計金額（税込）</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(product, index) in productAnalysis" :key="product.productId">
                   <td>{{ formatRank(index + 1) }}</td>
-                  <td>{{ product.productId }}</td>
                   <td>{{ product.displayName }}</td>
                   <td>{{ product.quantity }}</td>
                   <td>¥{{ formatNumber(product.totalInclTax) }}</td>
                 </tr>
                 <tr v-if="productAnalysis.length === 0">
-                  <td colspan="5" class="no-data">データがありません</td>
+                  <td colspan="4" class="no-data">データがありません</td>
                 </tr>
               </tbody>
             </table>
@@ -194,6 +211,13 @@
           </div>
         </div>
 
+        <div v-if="selectedYearMonth" class="summary-row">
+          <div class="summary-item">
+            <span class="summary-label">月間売上合計（税込）</span>
+            <span class="summary-value">¥{{ formatNumber(monthlyTotalInclTax) }}</span>
+          </div>
+        </div>
+
         <!-- 年月が選択されていない場合のメッセージ -->
         <div v-if="!selectedYearMonth" class="empty-state">
           <p>年月を選択してください</p>
@@ -203,7 +227,9 @@
         <div v-if="selectedYearMonth" class="chart-section">
           <h2>グラフ分析</h2>
           <div class="chart-container">
-            <Line :data="monthlyChartData" :options="chartOptions" />
+            <div class="chart-inner">
+              <Line :data="monthlyChartData" :options="chartOptions" />
+            </div>
           </div>
         </div>
 
@@ -250,27 +276,35 @@
         <!-- 商品分析 -->
         <div v-if="selectedYearMonth" class="product-analysis-section">
           <h2>商品分析</h2>
+          <p class="product-note">商品IDごとに集計しています。</p>
+          <div class="product-controls">
+            <label class="sort-label">
+              <span>並び替え</span>
+              <select v-model="productSortKey">
+                <option value="amount">金額</option>
+                <option value="quantity">数量</option>
+              </select>
+            </label>
+          </div>
           <div class="table-container">
             <table class="analysis-table">
               <thead>
                 <tr>
                   <th>順位</th>
-                  <th>商品ID</th>
                   <th>商品名</th>
                   <th>個数</th>
-                  <th>金額（税込）</th>
+                  <th>合計金額（税込）</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(product, index) in productAnalysis" :key="product.productId">
                   <td>{{ formatRank(index + 1) }}</td>
-                  <td>{{ product.productId }}</td>
                   <td>{{ product.displayName }}</td>
                   <td>{{ product.quantity }}</td>
                   <td>¥{{ formatNumber(product.totalInclTax) }}</td>
                 </tr>
                 <tr v-if="productAnalysis.length === 0">
-                  <td colspan="5" class="no-data">データがありません</td>
+                  <td colspan="4" class="no-data">データがありません</td>
                 </tr>
               </tbody>
             </table>
@@ -322,6 +356,7 @@ const selectedYearMonth = ref('') // 'YYYY-MM' format
 const selectedMonth = ref(null)
 const displayYear = ref(new Date().getFullYear())
 const showDatePicker = ref(false)
+const productSortKey = ref('amount') // 'amount' | 'quantity'
 
 // インメモリデータ
 const inMemorySales = ref([])
@@ -436,6 +471,26 @@ const chartOptions = computed(() => ({
   }
 }))
 
+const yearlyTotalInclTax = computed(() => {
+  if (selectedMode.value !== 'yearly' || inMemorySales.value.length === 0) {
+    return 0
+  }
+
+  return inMemorySales.value.reduce((sum, sale) => {
+    return sum + (sale.totals?.totalInclTax ?? 0)
+  }, 0)
+})
+
+const monthlyTotalInclTax = computed(() => {
+  if (selectedMode.value !== 'monthly' || !selectedYearMonth.value || inMemorySales.value.length === 0) {
+    return 0
+  }
+
+  return inMemorySales.value.reduce((sum, sale) => {
+    return sum + (sale.totals?.totalInclTax ?? 0)
+  }, 0)
+})
+
 const customerAnalysis = computed(() => {
   if (inMemorySales.value.length === 0 || inMemoryCustomers.value.length === 0) {
     return []
@@ -527,8 +582,13 @@ const productAnalysis = computed(() => {
     })
   })
 
-  // 金額の降順でソート
-  return result.sort((a, b) => b.totalInclTax - a.totalInclTax)
+  // 選択した項目でソート
+  return result.sort((a, b) => {
+    if (productSortKey.value === 'quantity') {
+      return b.quantity - a.quantity
+    }
+    return b.totalInclTax - a.totalInclTax
+  })
 })
 
 // Methods
@@ -965,11 +1025,75 @@ onMounted(() => {
 .chart-container {
   height: 400px;
   position: relative;
+  overflow-x: auto;
+}
+
+.chart-inner {
+  height: 300px;
+  min-width: 800px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 1rem;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #f8f9fa;
+  min-width: 220px;
+}
+
+.summary-label {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.summary-value {
+  font-weight: 700;
+  color: #333;
+  font-size: 1.4rem;
 }
 
 .customer-analysis-section,
 .product-analysis-section {
   margin-bottom: 2rem;
+}
+
+.product-note {
+  margin: 0 0 0.75rem;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.product-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.sort-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #444;
+  font-size: 0.9rem;
+}
+
+.sort-label select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 0.9rem;
 }
 
 .customer-analysis-section h2,
@@ -1099,6 +1223,10 @@ onMounted(() => {
 
   .chart-container {
     height: 300px;
+  }
+
+  .chart-inner {
+    min-width: 700px;
   }
 
   .payment-summary {

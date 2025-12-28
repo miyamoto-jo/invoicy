@@ -12,6 +12,7 @@ import ProductsView from '../views/ProductsView.vue'
 import TaxesView from '../views/TaxesView.vue'
 import SalesView from '../views/SalesView.vue'
 import SalesListView from '../views/SalesListView.vue'
+import SalesEditView from '../views/SalesEditView.vue'
 import SalesAnalyticsView from '../views/SalesAnalyticsView.vue'
 import InvoicesView from '../views/InvoicesView.vue'
 import InvoiceAnalyticsView from '../views/InvoiceAnalyticsView.vue'
@@ -76,6 +77,12 @@ const routes = [
     path: '/sales/list',
     name: 'sales-list',
     component: SalesListView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/sales/edit/:id',
+    name: 'sales-edit',
+    component: SalesEditView,
     meta: { requiresAuth: true }
   },
   {

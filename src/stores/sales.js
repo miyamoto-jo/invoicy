@@ -559,6 +559,87 @@ export const useSalesStore = defineStore('sales', () => {
       isLoading.value = false
     }
   }
+
+  const updateSale = async (saleId, updatedData) => {
+    try {
+      isLoading.value = true
+      error.value = null
+
+      const authStore = useAuthStore()
+      const token = authStore.getAccessToken()
+      if (!token) {
+        throw new Error('認証トークンがありません')
+      }
+
+      const existingSale = sales.value.find(sale => sale.id === saleId)
+      if (!existingSale) {
+        throw new Error('更新対象の売上が見つかりません')
+      }
+
+      const appFolder = await authStore.getAppFolderId()
+      const salesFolder = await getOrCreateSalesFolder(token, appFolder.id)
+
+      const updatedIssuedOn = updatedData.issuedOn || existingSale.issuedOn
+      const oldYearMonth = existingSale.issuedOn.substring(0, 7).replace('-', '')
+      const newYearMonth = updatedIssuedOn.substring(0, 7).replace('-', '')
+
+      const updatedLines = (updatedData.lines && updatedData.lines.length > 0)
+        ? updatedData.lines.map(line => SaleLine.fromData(line))
+        : existingSale.lines.map(line => SaleLine.fromData(line.toJSON ? line.toJSON() : line))
+
+      const totals = SaleTotals.calculateFromLines(updatedLines)
+
+      const now = new Date()
+      const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
+      const updatedAt = jstNow.toISOString().replace('Z', '+09:00')
+
+      const updatedSaleData = {
+        ...existingSale.toJSON(),
+        issuedOn: updatedIssuedOn,
+        lines: updatedLines.map(line => line.toJSON()),
+        note: updatedData.note ?? existingSale.note ?? '',
+        totals: totals.toJSON(),
+        updatedAt
+      }
+
+      const updateLedger = async (targetYearMonth, mutate) => {
+        const { fileId, entries, fileName } = await loadMonthlyLedgerEntries(token, salesFolder.id, targetYearMonth)
+        const mutatedEntries = mutate(entries)
+        const newFileId = await saveMonthlyLedgerEntries(token, salesFolder.id, fileId, fileName, mutatedEntries)
+        return newFileId
+      }
+
+      if (oldYearMonth === newYearMonth) {
+        await updateLedger(oldYearMonth, entries => {
+          const filtered = entries.filter(entry => entry.id !== saleId)
+          return [...filtered, updatedSaleData]
+        })
+      } else {
+        await updateLedger(oldYearMonth, entries => entries.filter(entry => entry.id !== saleId))
+        await updateLedger(newYearMonth, entries => {
+          const filtered = entries.filter(entry => entry.id !== saleId)
+          return [...filtered, updatedSaleData]
+        })
+      }
+
+      const updatedSale = Sale.fromData(updatedSaleData)
+      const index = sales.value.findIndex(sale => sale.id === saleId)
+      if (index !== -1) {
+        sales.value.splice(index, 1, updatedSale)
+      } else {
+        sales.value.unshift(updatedSale)
+      }
+      cacheSales()
+
+      return updatedSale
+    } catch (err) {
+      console.error('Failed to update sale:', err)
+      error.value = err.message || '売上の更新に失敗しました'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
   
   // ヘルパー関数（calculateTotalsはSaleTotals.calculateFromLines()に置き換えられました）
   
@@ -634,6 +715,52 @@ export const useSalesStore = defineStore('sales', () => {
       console.error('Failed to update monthly ledger:', err)
       throw err
     }
+  }
+
+  const loadMonthlyLedgerEntries = async (token, salesFolderId, yearMonth) => {
+    const fileName = `ledger-${yearMonth}.jsonl`
+    const query = `name='${fileName}' and '${salesFolderId}' in parents and trashed=false`
+    const data = await googleApiClient.searchFiles(token, query)
+    const fileId = data.files && data.files.length > 0 ? data.files[0].id : null
+
+    let entries = []
+    if (fileId) {
+      const content = await googleApiClient.getFileContentAsText(token, fileId)
+      if (content && content.trim()) {
+        const lines = content.split('\n').filter(line => line.trim())
+        for (const line of lines) {
+          try {
+            entries.push(JSON.parse(line))
+          } catch (parseErr) {
+            console.warn('Failed to parse sale line:', line, parseErr)
+          }
+        }
+      }
+    }
+
+    return { fileId, entries, fileName }
+  }
+
+  const saveMonthlyLedgerEntries = async (token, salesFolderId, fileId, fileName, entries) => {
+    const jsonlContent = entries.map(entry => JSON.stringify(entry)).join('\n')
+
+    if (fileId) {
+      await googleApiClient.updateFileContentAsText(token, fileId, jsonlContent)
+      return fileId
+    }
+
+    if (entries.length === 0) {
+      return null
+    }
+
+    const fileData = {
+      name: fileName,
+      parents: [salesFolderId]
+    }
+    const createResponse = await googleApiClient.createFile(token, fileData)
+    const file = await createResponse.json()
+    await googleApiClient.updateFileContentAsText(token, file.id, jsonlContent)
+    return file.id
   }
 
   const voidSale = async (saleToVoid, issuedOn) => {
@@ -737,6 +864,7 @@ export const useSalesStore = defineStore('sales', () => {
     bulkReflectSales,
     searchSales,
     getSaleById,
+    updateSale,
     deleteSale,
     voidSale
   }

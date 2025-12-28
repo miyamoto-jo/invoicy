@@ -10,6 +10,7 @@
  * @property {boolean} [isNegative] - マイナス伝票かどうか
  * @property {string|null} [negatesTicketId] - 相殺する伝票ID（オプション）
  * @property {string} createdAt - 作成日時（ISO形式）
+ * @property {string|null} [updatedAt] - 更新日時（ISO形式、未更新の場合はnull）
  */
 
 import { SaleLine } from './SaleLine.js'
@@ -34,6 +35,7 @@ export class Sale {
     this.isNegative = data.isNegative || false
     this.negatesTicketId = data.negatesTicketId || null
     this.createdAt = data.createdAt
+    this.updatedAt = data.updatedAt || null
   }
 
   /**
@@ -97,7 +99,8 @@ export class Sale {
       totals: this.totals ? this.totals.toJSON() : null,
       isNegative: this.isNegative,
       negatesTicketId: this.negatesTicketId,
-      createdAt: this.createdAt
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt
     }
   }
 

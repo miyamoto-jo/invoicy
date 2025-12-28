@@ -1,5 +1,15 @@
 <template>
   <div class="sales-form">
+    <!-- 売上反映ボタン -->
+    <div v-if="!isEditMode && localSales.length > 0" class="sales-reflect-section">
+      <button 
+        type="button" 
+        @click="handleReflectSales" 
+        class="btn btn-danger"
+      >
+        売上反映（{{ localSales.length }}件）
+      </button>
+    </div>
     <form @submit.prevent="handleSubmit" class="form">
       <!-- 顧客選択 -->
       <div class="form-group">
@@ -9,6 +19,7 @@
           v-model="formData.customerId" 
           class="form-select"
           :class="{ 'error': errors.customerId }"
+          :disabled="isEditMode"
           required
         >
           <option value="">顧客を選択してください</option>
@@ -62,13 +73,19 @@
                 v-if="getProductQuantity(product.id) > 0"
                 type="button"
                 class="minus-btn"
+                @pointerdown.stop
+                @pointerup.stop
                 @click.stop="removeProductFromCart(product)"
               >
                 -
               </button>
               
               <!-- 数量バッジ -->
-              <div v-if="getProductQuantity(product.id) > 0" class="quantity-badge">
+              <div 
+                v-if="getProductQuantity(product.id) > 0" 
+                class="quantity-badge"
+                @click.stop="openQuantityModal(product)"
+              >
                 {{ getProductQuantity(product.id) }}
               </div>
             </div>
@@ -154,7 +171,7 @@
           class="btn btn-primary"
           :disabled="selectedProducts.length === 0"
         >
-          売上書込み
+          {{ isEditMode ? '更新' : '売上書込み' }}
         </button>
         
         <button 
@@ -165,21 +182,10 @@
           キャンセル
         </button>
       </div>
-      
-      <!-- 売上反映ボタン -->
-      <div v-if="localSales.length > 0" class="sales-reflect-section">
-        <button 
-          type="button" 
-          @click="handleReflectSales" 
-          class="btn btn-danger"
-        >
-          売上反映（{{ localSales.length }}件）
-        </button>
-      </div>
     </form>
 
     <!-- キャンセル確認ダイアログ -->
-    <div v-if="showCancelDialog" class="modal-overlay" @click="closeCancelDialog">
+    <div v-if="!isEditMode && showCancelDialog" class="modal-overlay" @click="closeCancelDialog">
       <div class="modal-content" @click.stop>
         <h3>確認</h3>
         <p v-if="localSales.length > 0">
@@ -192,6 +198,42 @@
         <div class="modal-actions">
           <button @click="confirmCancel" class="btn btn-primary">はい</button>
           <button @click="closeCancelDialog" class="btn btn-secondary">いいえ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数量変更モーダル -->
+    <div v-if="showQuantityModal" class="modal-overlay" @click="closeQuantityModal">
+      <div class="modal-content" @click.stop>
+        <h3>数量を変更</h3>
+        <p class="modal-product-name">{{ modalProductName }}</p>
+        <div class="modal-form">
+          <label class="form-label">数量（0〜999）</label>
+          <input
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            class="form-input"
+            :value="quantityInput"
+            @input="onQuantityInputChange"
+            placeholder="0〜999の半角数字"
+          >
+          <div 
+            v-if="quantityInput !== '' && !isQuantityInputValid" 
+            class="error-message"
+          >
+            0〜999の半角数字で入力してください
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button 
+            type="button" 
+            class="btn btn-primary" 
+            :disabled="!isQuantityInputValid" 
+            @click="applyQuantityChange"
+          >
+            変更
+          </button>
         </div>
       </div>
     </div>
@@ -212,6 +254,10 @@ const props = defineProps({
   initialData: {
     type: Object,
     default: () => ({})
+  },
+  mode: {
+    type: String,
+    default: 'create'
   }
 })
 
@@ -241,6 +287,9 @@ const errors = ref({})
 // isReflectingは共通のローディング画面を使用するため削除
 const error = ref('')
 const showCancelDialog = ref(false)
+const showQuantityModal = ref(false)
+const quantityInput = ref('')
+const modalProduct = ref(null)
 
 // ローカルメモリでの売上情報保持
 const localSales = ref([])
@@ -248,6 +297,12 @@ const localSales = ref([])
 // Computed
 const customers = computed(() => customersStore.sortedCustomers)
 const products = computed(() => productsStore.sortedProducts)
+const productMap = computed(() => {
+  const map = new Map()
+  products.value.forEach(product => map.set(product.id, product))
+  return map
+})
+const isEditMode = computed(() => props.mode === 'edit')
 
 // 選択した顧客が扱える商品のみをフィルタ
 const availableProducts = computed(() => {
@@ -263,23 +318,32 @@ const availableProducts = computed(() => {
 
 const taxes = computed(() => taxesStore.sortedTaxes)
 
-// 設定からrounding値を取得
-const rounding = computed(() => {
-  return settingsStore.businessSettings?.rounding || 'floor'
-})
+// 税率設定からrounding値を取得
+const rounding = computed(() => taxesStore.rounding || 'floor')
 
-// 設定からデフォルト税率IDを取得
-const defaultTaxId = computed(() => {
-  return settingsStore.businessSettings?.default_tax_id || null
-})
+// 税率設定からデフォルト税率IDを取得（Piniaの自動アンラップをそのまま利用）
+const defaultTaxId = computed(() => taxesStore.defaultTaxId || null)
 
 // デフォルト税率を取得
 const defaultTaxRate = computed(() => {
-  if (!defaultTaxId.value || taxes.value.length === 0) return null
+  const id = defaultTaxId.value
+  if (!id || taxes.value.length === 0) return null
   
-  const defaultTax = taxes.value.find(tax => tax.id === defaultTaxId.value)
-  console.log('Default tax lookup:', { defaultTaxId: defaultTaxId.value, defaultTax, availableTaxes: taxes.value })
+  const defaultTax = taxes.value.find(tax => tax.id === id)
+  console.log('Default tax lookup:', { defaultTaxId: id, defaultTax, availableTaxes: taxes.value })
   return defaultTax ? defaultTax.rate : null
+})
+
+const modalProductName = computed(() => {
+  return modalProduct.value ? modalProduct.value.getDisplayName() : ''
+})
+
+const isQuantityInputValid = computed(() => {
+  const value = quantityInput.value.trim()
+  if (value === '') return false
+  if (!/^\d{1,3}$/.test(value)) return false
+  const numericValue = Number(value)
+  return numericValue >= 0 && numericValue <= 999
 })
 
 const totals = computed(() => {
@@ -290,24 +354,23 @@ const totals = computed(() => {
     subtotalExclTax += item.priceExclTax * item.quantity
   })
   
-  // 伝票全体の税率で消費税を計算
+  // 伝票全体の税率で消費税を計算（整数演算で丸め誤差を防ぐ）
   let taxAmount = 0
   if (formData.value.invoiceTaxRate) {
-    const rawTaxAmount = subtotalExclTax * (formData.value.invoiceTaxRate / 100)
-    
-    // rounding設定に基づいて丸め処理
+    const rawTaxScaled = subtotalExclTax * formData.value.invoiceTaxRate // 百分率を掛けた整数値
+
     switch (rounding.value) {
       case 'floor':
-        taxAmount = Math.floor(rawTaxAmount)
+        taxAmount = Math.floor(rawTaxScaled / 100)
         break
       case 'ceil':
-        taxAmount = Math.ceil(rawTaxAmount)
+        taxAmount = Math.floor((rawTaxScaled + 99) / 100)
         break
       case 'round':
-        taxAmount = Math.round(rawTaxAmount)
+        taxAmount = Math.floor((rawTaxScaled + 50) / 100)
         break
       default:
-        taxAmount = Math.floor(rawTaxAmount)
+        taxAmount = Math.floor(rawTaxScaled / 100)
     }
   }
   
@@ -352,6 +415,7 @@ const initializeData = async () => {
     if (props.initialData.note) {
       formData.value.note = props.initialData.note
     }
+    populateInitialLines()
   } catch (err) {
     console.error('Failed to initialize form data:', err)
     error.value = 'データの初期化に失敗しました'
@@ -374,6 +438,31 @@ const setDefaultTaxRate = async () => {
   }
 }
 
+const populateInitialLines = () => {
+  if (!props.initialData.lines || props.initialData.lines.length === 0) return
+
+  if (!formData.value.invoiceTaxRate) {
+    const initialRate = props.initialData.lines[0]?.taxRate
+    if (initialRate !== undefined) {
+      formData.value.invoiceTaxRate = initialRate
+    }
+  }
+
+  selectedProducts.value = props.initialData.lines.map(line => {
+    const product = productMap.value.get(line.productId)
+    return {
+      productId: line.productId,
+      productName: line.productName || product?.getDisplayName() || '不明商品',
+      alias: line.alias || product?.alias || '',
+      quantity: line.quantity ?? 0,
+      priceExclTax: line.priceExclTax ?? product?.priceExclTax ?? 0,
+      taxRate: line.taxRate ?? formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+    }
+  })
+
+  recalculateTotals()
+}
+
 // 商品カート関連のメソッド
 const addProductToCart = (product) => {
   const existingItem = selectedProducts.value.find(item => item.productId === product.id)
@@ -390,6 +479,33 @@ const addProductToCart = (product) => {
       productName: product.getDisplayName(), // モデルのメソッドを使用
       alias: product.alias,
       quantity: 1,
+      priceExclTax: product.priceExclTax,
+      taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+    })
+  }
+}
+
+const setProductQuantity = (product, quantity) => {
+  const existingItem = selectedProducts.value.find(item => item.productId === product.id)
+  const normalizedQuantity = Math.min(Math.max(quantity, 0), 999)
+
+  if (normalizedQuantity === 0) {
+    if (existingItem) {
+      const index = selectedProducts.value.findIndex(item => item.productId === product.id)
+      selectedProducts.value.splice(index, 1)
+    }
+    return
+  }
+
+  if (existingItem) {
+    existingItem.quantity = normalizedQuantity
+    existingItem.taxRate = formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+  } else {
+    selectedProducts.value.push({
+      productId: product.id,
+      productName: product.getDisplayName(),
+      alias: product.alias,
+      quantity: normalizedQuantity,
       priceExclTax: product.priceExclTax,
       taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
     })
@@ -422,6 +538,17 @@ const recalculateTotals = () => {
   })
 }
 
+const buildLinesPayload = () => {
+  return selectedProducts.value.map(item => ({
+    productId: item.productId,
+    productName: item.productName,
+    alias: item.alias,
+    quantity: item.quantity,
+    priceExclTax: item.priceExclTax,
+    taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+  }))
+}
+
 const validateForm = () => {
   errors.value = {}
   
@@ -443,30 +570,36 @@ const validateForm = () => {
   return Object.keys(errors.value).length === 0
 }
 
+const scrollToTop = () => {
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
 const handleSubmit = async () => {
+  scrollToTop()
+  if (!validateForm()) {
+    return
+  }
+  
+  const saleData = {
+    customerId: formData.value.customerId,
+    issuedOn: formData.value.issuedOn,
+    lines: buildLinesPayload(),
+    note: formData.value.note
+  }
+
+  // 編集モードでは即座に親へ委譲
+  if (isEditMode.value) {
+    error.value = ''
+    emit('submit', saleData)
+    return
+  }
+
   try {
-    if (!validateForm()) {
-      return
-    }
-    
     setLoading(true, '保存中...', '売上情報を保存しています')
     error.value = ''
-    
-    // 売上データの作成
-    const saleData = {
-      customerId: formData.value.customerId,
-      issuedOn: formData.value.issuedOn,
-      lines: selectedProducts.value.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        alias: item.alias,
-        quantity: item.quantity,
-        priceExclTax: item.priceExclTax,
-        taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
-      })),
-      note: formData.value.note
-    }
-    
+
     // ローカルメモリに売上情報を保存
     localSales.value.push(saleData)
     
@@ -519,6 +652,10 @@ const showToast = (message, type = 'success') => {
 }
 
 const handleCancel = () => {
+  if (isEditMode.value) {
+    emit('cancel')
+    return
+  }
   // ローカルメモリに売上情報がある場合は必ず確認ダイアログを表示
   if (localSales.value.length > 0) {
     showCancelDialog.value = true
@@ -560,6 +697,30 @@ const clearForm = () => {
 // ローカルメモリの売上情報をクリアするメソッド
 const clearLocalSales = () => {
   localSales.value = []
+}
+
+const openQuantityModal = (product) => {
+  modalProduct.value = product
+  quantityInput.value = String(getProductQuantity(product.id))
+  showQuantityModal.value = true
+}
+
+const closeQuantityModal = () => {
+  showQuantityModal.value = false
+  modalProduct.value = null
+  quantityInput.value = ''
+}
+
+const onQuantityInputChange = (event) => {
+  // 入力値はそのまま保持し、バリデーションで判定する（非数字を入れた場合に無効化するため）
+  quantityInput.value = event.target.value.slice(0, 3)
+}
+
+const applyQuantityChange = () => {
+  if (!modalProduct.value || !isQuantityInputValid.value) return
+  const quantity = Number(quantityInput.value)
+  setProductQuantity(modalProduct.value, quantity)
+  closeQuantityModal()
 }
 
 const formatNumber = (num) => {
@@ -844,7 +1005,7 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 1rem;
+  margin-bottom: 1rem;
 }
 
 .btn-danger {
@@ -894,6 +1055,17 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   display: flex;
   gap: 1rem;
   justify-content: center;
+}
+
+.modal-product-name {
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.modal-form {
+  margin-bottom: 1.5rem;
+  text-align: left;
 }
 
 /* レスポンシブ対応 */

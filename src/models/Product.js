@@ -72,7 +72,7 @@ export class Product {
     if (taxRate < 0) {
       throw new Error('税率は0以上の数値で入力してください')
     }
-    const taxAmount = Math.floor(this.priceExclTax * (taxRate / 100))
+    const taxAmount = Math.trunc(this.priceExclTax * (taxRate / 100))
     return this.priceExclTax + taxAmount
   }
 

@@ -40,7 +40,6 @@ const props = defineProps({
 })
 
 const imageLoaded = ref(false)
-const debug = ref(true) // デバッグモードを有効化
 
 // 3枚の画像からランダムで1枚を選択
 const selectedImage = computed(() => {
@@ -63,22 +62,17 @@ const loadImageWithFallback = async () => {
   
   for (const image of images) {
     try {
-      console.log(`🔄 Trying to load image: ${image}`)
       await tryLoadImage(image)
-      console.log(`✅ Successfully loaded image: ${image}`)
     } catch (error) {
-      console.log(`❌ Failed to load image: ${image}`)
       imageLoaded.value = false
       return
     }
   }
   
-  console.log('✅ All images loaded successfully')
   imageLoaded.value = true
 }
 
 onMounted(async () => {
-  console.log('🔄 Starting image loading process...')
   await loadImageWithFallback()
 })
 </script>

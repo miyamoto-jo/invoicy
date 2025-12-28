@@ -38,7 +38,7 @@ export class InvoiceDetail {
    * @returns {number} 税額
    */
   calculateTaxAmount() {
-    return Math.floor(this.subtotalExclTax * (this.taxRate / 100))
+    return Math.trunc(this.subtotalExclTax * (this.taxRate / 100))
   }
 
   /**

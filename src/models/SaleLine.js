@@ -37,7 +37,7 @@ export class SaleLine {
    */
   calculateTaxAmount() {
     const subtotal = this.calculateSubtotalExclTax()
-    return Math.floor(subtotal * (this.taxRate / 100))
+    return Math.trunc(subtotal * (this.taxRate / 100))
   }
 
   /**

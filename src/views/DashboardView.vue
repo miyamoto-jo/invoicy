@@ -131,7 +131,6 @@ const formatBytes = (bytes) => {
 const refreshStorageInfo = async () => {
   try {
     isRefreshing.value = true
-    console.log('🔄 Refreshing storage info...')
     
     const token = authStore.getAccessToken()
     if (!token) {
@@ -148,7 +147,6 @@ const refreshStorageInfo = async () => {
     
     if (driveInfoResponse.ok) {
       const driveInfo = await driveInfoResponse.json()
-      console.log('📄 Updated drive info:', driveInfo)
       
       // 容量情報の計算
       if (driveInfo.storageQuota) {
@@ -181,8 +179,6 @@ const refreshStorageInfo = async () => {
         const { saveToLocalStorage } = useStorage()
         const { STORAGE_KEYS } = await import('../config/api.js')
         saveToLocalStorage(STORAGE_KEYS.USER_INFO, updatedUser)
-        
-        console.log('✅ Storage info updated successfully')
       } else {
         console.warn('⚠️ No storage quota information in response')
       }
@@ -210,12 +206,9 @@ onMounted(async () => {
   try {
     // 認証状態の確認
     if (!authStore.isAuthenticated) {
-      console.log('❌ User not authenticated, redirecting to login')
       router.push('/')
       return
     }
-    
-    console.log('✅ User authenticated, initializing data...')
     
     // 設定データを初期化（既に初期化済みの場合はスキップ）
     if (!settingsStore.isInitialized) {
@@ -230,13 +223,10 @@ onMounted(async () => {
     
     // 事業者設定が存在しない場合は設定画面にリダイレクト
     if (!settingsStore.hasBusinessSettings) {
-      console.log('❌ No business settings found, redirecting to setup')
       router.push('/business-settings')
       return
     }
-    
-    console.log('✅ Business settings loaded')
-    
+
   } catch (err) {
     console.error('Failed to initialize data:', err)
     clearLoading()

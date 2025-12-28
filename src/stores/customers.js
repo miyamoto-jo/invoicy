@@ -147,9 +147,7 @@ export const useCustomersStore = defineStore('customers', () => {
       // ファイルを更新
       await saveCustomersToFile(token)
       cacheCustomers()
-      
-      console.log('Customer created successfully:', newCustomer.toJSON())
-      
+
       return newCustomer
       
     } catch (err) {
@@ -291,9 +289,7 @@ export const useCustomersStore = defineStore('customers', () => {
       // ファイルを更新
       await saveCustomersToFile(token)
       cacheCustomers()
-      
-      console.log('Customer updated successfully:', updatedCustomer.toJSON())
-      
+
       return updatedCustomer
       
     } catch (err) {
@@ -329,9 +325,7 @@ export const useCustomersStore = defineStore('customers', () => {
       // ファイルを更新
       await saveCustomersToFile(token)
       cacheCustomers()
-      
-      console.log('Customer deleted successfully')
-      
+
     } catch (err) {
       console.error('Failed to delete customer:', err)
       error.value = err.message || '顧客の削除に失敗しました'

@@ -80,7 +80,6 @@ const pendingNavigation = ref(null)
 
 // Methods
 const handleSaleCreated = (sale) => {
-  console.log('Sale created:', sale)
   showSuccessMessage.value = true
   showToast('売上伝票が正常に登録されました', 'success')
 }

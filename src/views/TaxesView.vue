@@ -12,7 +12,7 @@
                 id="rounding" 
                 v-model="taxesStore.rounding"
                 @change="handleRoundingChange"
-                :disabled="taxesStore.isLoading"
+                :disabled="true"
               >
                 <option 
                   v-for="option in taxesStore.roundingOptions" 

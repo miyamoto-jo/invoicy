@@ -330,7 +330,6 @@ const defaultTaxRate = computed(() => {
   if (!id || taxes.value.length === 0) return null
   
   const defaultTax = taxes.value.find(tax => tax.id === id)
-  console.log('Default tax lookup:', { defaultTaxId: id, defaultTax, availableTaxes: taxes.value })
   return defaultTax ? defaultTax.rate : null
 })
 
@@ -429,10 +428,8 @@ const setDefaultTaxRate = async () => {
   
   if (!formData.value.invoiceTaxRate) {
     if (defaultTaxRate.value) {
-      console.log('Setting default tax rate:', defaultTaxRate.value)
       formData.value.invoiceTaxRate = defaultTaxRate.value
     } else if (taxes.value.length > 0) {
-      console.log('Setting first tax rate:', taxes.value[0].rate)
       formData.value.invoiceTaxRate = taxes.value[0].rate
     }
   }
@@ -743,10 +740,8 @@ onMounted(async () => {
   // 初期化完了後、税率が設定されていない場合は設定
   if (!formData.value.invoiceTaxRate) {
     if (defaultTaxRate.value) {
-      console.log('Setting default tax rate in onMounted:', defaultTaxRate.value)
       formData.value.invoiceTaxRate = defaultTaxRate.value
     } else if (taxes.value.length > 0) {
-      console.log('Setting first tax rate in onMounted:', taxes.value[0].rate)
       formData.value.invoiceTaxRate = taxes.value[0].rate
     }
   }
@@ -776,11 +771,9 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   if (newTaxes.length > 0 && newSettings && !formData.value.invoiceTaxRate) {
     if (defaultTaxRate.value) {
       // デフォルト税率が設定されている場合、設定ファイルのデフォルト税率を設定
-      console.log('Setting default tax rate from watch:', defaultTaxRate.value)
       formData.value.invoiceTaxRate = defaultTaxRate.value
     } else if (newTaxes.length > 0) {
       // デフォルト税率が設定されていない場合は、最初の税率を設定
-      console.log('Setting first tax rate from watch:', newTaxes[0].rate)
       formData.value.invoiceTaxRate = newTaxes[0].rate
     }
   }

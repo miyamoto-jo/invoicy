@@ -426,8 +426,8 @@ const calculateInvoiceData = async (customerId) => {
   details.forEach(detail => {
     subtotalExclTax += detail.subtotalExclTax
     
-    // 税額計算（切り捨て）
-    const taxAmount = Math.floor(detail.subtotalExclTax * (detail.taxRate / 100))
+    // 税額計算（0 方向の切り捨て）
+    const taxAmount = Math.trunc(detail.subtotalExclTax * (detail.taxRate / 100))
     if (taxByRate[detail.taxRate]) {
       taxByRate[detail.taxRate] += taxAmount
     } else {

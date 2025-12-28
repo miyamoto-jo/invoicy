@@ -166,7 +166,7 @@ const generateCustomerPdf = async (customer, pdf, isFirstPageOfDocument = false)
         // taxRateが存在しない場合はデフォルト10%、0の場合は0%として扱う
         const taxRate = detail.taxRate !== undefined && detail.taxRate !== null ? detail.taxRate : 10
         // 税額計算を修正（taxRateはパーセンテージなので100で割る）
-        const tax = Math.floor(amount * taxRate / 100)
+        const tax = Math.trunc(amount * taxRate / 100)
         const total = amount + tax
         
         allDetails.push({

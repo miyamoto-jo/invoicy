@@ -571,8 +571,17 @@ const validateForm = () => {
 }
 
 const scrollToTop = () => {
-  if (typeof window !== 'undefined') {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  if (typeof window === 'undefined') return
+
+  // iOS Safari など scrollTo オプション未対応環境向けフォールバック
+  const el = document.scrollingElement || document.documentElement || document.body
+  const supportsSmooth = 'scrollBehavior' in document.documentElement.style
+
+  if (supportsSmooth && el.scrollTo) {
+    el.scrollTo({ top: 0, behavior: 'smooth' })
+  } else {
+    el.scrollTop = 0
+    window.scrollTo(0, 0)
   }
 }
 

@@ -41,7 +41,7 @@ export const useTaxesStore = defineStore('taxes', () => {
       const payload = {
         taxes: taxes.value.map(tax => tax.toJSON()),
         rounding: rounding.value,
-        defaultTaxId: defaultTaxId.value
+        default_tax_id: defaultTaxId.value
       }
       saveWithTimestamp(STORAGE_KEYS.TAXES_CACHE, payload)
     } catch (err) {

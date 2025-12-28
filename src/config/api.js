@@ -58,9 +58,7 @@ export const STORAGE_KEYS = {
   APP_FOLDER_ID: 'invoicy_app_folder_id',
   PRODUCTS_CACHE: 'invoicy_products_cache',
   CUSTOMERS_CACHE: 'invoicy_customers_cache',
-  TAXES_CACHE: 'invoicy_taxes_cache',
-  SALES_CACHE: 'invoicy_sales_cache',
-  INVOICES_CACHE: 'invoicy_invoices_cache'
+  TAXES_CACHE: 'invoicy_taxes_cache'
 }
 
 // サブフォルダのストレージキーを生成するヘルパー関数

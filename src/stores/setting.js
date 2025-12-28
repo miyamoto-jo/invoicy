@@ -23,7 +23,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const initializeSettings = async () => {
     // 既に初期化済みの場合はスキップ
     if (isInitialized.value) {
-      console.log('✅ Settings already initialized, skipping...')
       return
     }
     
@@ -41,14 +40,12 @@ export const useSettingsStore = defineStore('settings', () => {
       // ローカルストレージから事業者設定を確認
       const cachedSettings = loadFromLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS)
       if (cachedSettings) {
-        console.log('✅ Using cached business settings from localStorage')
         // BusinessSettingsインスタンスに変換
         businessSettings.value = BusinessSettings.fromData(cachedSettings)
         isInitialized.value = true
         return
       }
       
-      console.log('📡 Fetching business settings from API')
       // setting.jsonファイルの存在確認と取得
       await loadSettingsFile(token)
       
@@ -72,14 +69,10 @@ export const useSettingsStore = defineStore('settings', () => {
       // アプリフォルダの取得または作成
       let appFolder
       try {
-        console.log('🔍 Trying to get existing app folder...')
         appFolder = await authStore.getAppFolderId()
-        console.log('✅ Found existing app folder:', appFolder.id)
       } catch (err) {
-        console.log('❌ App folder not found, creating new one...', err.message)
         try {
           appFolder = await authStore.ensureAppFolder(token)
-          console.log('✅ Created new app folder:', appFolder.id)
         } catch (createErr) {
           console.error('❌ Failed to create app folder:', createErr)
           throw new Error(`アプリフォルダの作成に失敗しました: ${createErr.message}`)
@@ -97,7 +90,6 @@ export const useSettingsStore = defineStore('settings', () => {
       } else {
         // 設定ファイルが存在しない場合はnullに設定
         businessSettings.value = null
-        console.log('Settings file not found, will show initial setup')
       }
       
     } catch (err) {
@@ -118,8 +110,6 @@ export const useSettingsStore = defineStore('settings', () => {
       
       // ローカルストレージに保存（JSON形式で保存）
       saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, businessSettingsInstance.toJSON())
-      
-      console.log('Settings loaded successfully and cached:', businessSettings.value)
       
     } catch (err) {
       console.error('Failed to load settings from file:', err)
@@ -170,13 +160,10 @@ export const useSettingsStore = defineStore('settings', () => {
       // ファイルを作成
       const createResponse = await googleApiClient.createFile(token, fileData)
       const createdFile = await createResponse.json()
-      console.log('Settings file created:', createdFile.id)
       
       // ファイルの内容を更新
       await googleApiClient.updateFileContent(token, createdFile.id, businessSettingsInstance.toJSON())
-      
-      console.log('Business settings created successfully and cached')
-      
+
       return createdFile
       
     } catch (err) {
@@ -232,7 +219,6 @@ export const useSettingsStore = defineStore('settings', () => {
       
       // ファイルの内容を更新
       await googleApiClient.updateFileContent(token, fileId, businessSettingsInstance.toJSON())
-      console.log('Settings file updated:', fileId)
 
       // ローカルストレージに保存（JSON形式で保存）
       saveToLocalStorage(STORAGE_KEYS.BUSINESS_SETTINGS, businessSettingsInstance.toJSON())
@@ -257,7 +243,6 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = false
     error.value = null
     isInitialized.value = false
-    console.log('🔄 Settings store reset')
   }
   
 

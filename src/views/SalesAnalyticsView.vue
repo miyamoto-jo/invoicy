@@ -620,22 +620,16 @@ const loadYearlyData = async () => {
 
     // マスターデータの読み込み（既にインメモリにある場合はスキップ）
     if (inMemoryCustomers.value.length === 0) {
-      console.log('[テスト] 顧客マスター取得開始')
       await customersStore.loadCustomers()
       inMemoryCustomers.value = [...customersStore.customers]
-      console.log('[テスト] 顧客マスター取得完了:', inMemoryCustomers.value.length, '件')
-      console.log('[テスト] 顧客マスターがインメモリに保存されました:', inMemoryCustomers.value.length > 0)
     } else {
-      console.log('[テスト] 顧客マスターは既にインメモリに存在します:', inMemoryCustomers.value.length, '件')
+      // 既存のキャッシュを利用
     }
     if (inMemoryProducts.value.length === 0) {
-      console.log('[テスト] 商品マスター取得開始')
       await productsStore.loadProducts()
       inMemoryProducts.value = [...productsStore.products]
-      console.log('[テスト] 商品マスター取得完了:', inMemoryProducts.value.length, '件')
-      console.log('[テスト] 商品マスターがインメモリに保存されました:', inMemoryProducts.value.length > 0)
     } else {
-      console.log('[テスト] 商品マスターは既にインメモリに存在します:', inMemoryProducts.value.length, '件')
+      // 既存のキャッシュを利用
     }
 
     // 年間の売上データを取得

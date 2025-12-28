@@ -48,7 +48,6 @@ export function useStorage() {
   const saveToLocalStorage = (key, data) => {
     try {
       localStorage.setItem(key, JSON.stringify(data))
-      console.log(`💾 Saved to localStorage: ${key}`)
     } catch (err) {
       console.error(`Failed to save to localStorage: ${key}`, err)
     }
@@ -77,7 +76,6 @@ export function useStorage() {
       Object.values(STORAGE_KEYS).forEach(key => {
         localStorage.removeItem(key)
       })
-      console.log('🧹 Cleared all invoicy data from localStorage')
     } catch (err) {
       console.error('Failed to clear localStorage', err)
     }
@@ -90,7 +88,6 @@ export function useStorage() {
   const removeFromLocalStorage = (key) => {
     try {
       localStorage.removeItem(key)
-      console.log(`🗑️ Removed from localStorage: ${key}`)
     } catch (err) {
       console.error(`Failed to remove from localStorage: ${key}`, err)
     }

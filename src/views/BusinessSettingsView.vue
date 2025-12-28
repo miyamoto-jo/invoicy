@@ -185,9 +185,8 @@ onMounted(async () => {
     
     // 設定が存在しない場合は初回設定モード
     if (!settingsStore.hasBusinessSettings) {
-      console.log('❌ No business settings found, staying on settings page for initial setup')
+      // 初回設定モード
     } else {
-      console.log('✅ Business settings found, loading for editing')
       // 編集モードの場合は既存データをフォームに設定
       if (settingsStore.businessSettings) {
         const business = settingsStore.businessSettings
@@ -265,7 +264,6 @@ const handleSubmit = async () => {
     }
     
     // 成功時はダッシュボードにリダイレクト
-    console.log('✅ Business settings saved successfully, redirecting to dashboard')
     router.push('/dashboard')
     
   } catch (err) {

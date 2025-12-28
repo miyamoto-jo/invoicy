@@ -252,21 +252,13 @@ const searchFilters = ref({
 const filteredInvoices = computed(() => {
   let result = invoicesStore.sortedInvoices
   
-  console.log('🔍 Debug filteredInvoices:')
-  console.log('📊 Total invoices in store:', invoicesStore.invoices.length)
-  console.log('📊 Sorted invoices:', invoicesStore.sortedInvoices.length)
-  console.log('🔍 Search filters:', searchFilters.value)
-  console.log('📄 All invoices:', invoicesStore.invoices)
-  
   if (searchFilters.value.customerName) {
     result = result.filter(invoice => 
       invoice.customerName.includes(searchFilters.value.customerName)
     )
-    console.log('🔍 After customer filter:', result.length)
   }
   
   if (searchFilters.value.period) {
-    console.log('🔍 Filtering by period:', searchFilters.value.period)
     result = result.filter(invoice => {
       // 請求書の期間をYYYY-MM形式に変換して比較
       if (!invoice.period) {
@@ -274,14 +266,10 @@ const filteredInvoices = computed(() => {
         return false // periodが存在しない場合はフィルタから除外
       }
       const invoiceYearMonth = invoice.period.replace('年', '-').replace('月分', '')
-      const matches = invoiceYearMonth === searchFilters.value.period
-      console.log(`📄 Invoice period: "${invoice.period}" -> "${invoiceYearMonth}", filter: "${searchFilters.value.period}", matches: ${matches}`)
-      return matches
+      return invoiceYearMonth === searchFilters.value.period
     })
-    console.log('🔍 After period filter:', result.length)
   }
   
-  console.log('📊 Final filtered result:', result.length)
   return result
 })
 
@@ -314,7 +302,6 @@ const availableMonths = computed(() => {
 // Methods
 const initializeData = async () => {
   try {
-    console.log('🚀 Initializing data...')
     // ローディング状態を開始
     invoicesStore.isLoading = true
     
@@ -330,8 +317,6 @@ const initializeData = async () => {
       customersStore.initializeCustomers(),
       salesStore.initializeSales()
     ])
-    console.log('✅ Data initialization completed')
-    console.log('📊 Invoices after init:', invoicesStore.invoices.length)
   } catch (err) {
     console.error('Failed to initialize data:', err)
     invoicesStore.error = 'データの読み込みに失敗しました'

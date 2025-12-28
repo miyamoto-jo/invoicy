@@ -28,9 +28,7 @@ export const useInvoicesStore = defineStore('invoices', () => {
       isLoading.value = true
       error.value = null
       const year = targetYear || new Date().getFullYear()
-      console.log(`🔄 Loading invoices for year ${year}...`)
       await loadInvoices(year)
-      console.log('✅ Invoices loaded successfully')
     } catch (err) {
       console.error('Failed to initialize invoices:', err)
       error.value = '請求書データの初期化に失敗しました'
@@ -86,8 +84,6 @@ export const useInvoicesStore = defineStore('invoices', () => {
         }
         
         invoices.value = invoicesData
-
-        console.log(`✅ Loaded ${invoicesData.length} invoices for year ${year}`)
       } else {
         invoices.value = []
       }
@@ -364,9 +360,7 @@ export const useInvoicesStore = defineStore('invoices', () => {
     const dateStr = `${year}${String(parseInt(month)).padStart(2, '0')}` // 202501
     // customerIdからプレフィックス（cus_）を除去して使用
     const customerIdShort = customerId.replace('cus_', '')
-    const invoiceId = `inv_${customerIdShort}_${dateStr}`
-    console.log('🔍 Generated Invoice ID:', invoiceId, 'from customerId:', customerId, 'period:', period)
-    return invoiceId
+    return `inv_${customerIdShort}_${dateStr}`
   }
   
   // Google Drive API ヘルパー関数
@@ -377,7 +371,6 @@ export const useInvoicesStore = defineStore('invoices', () => {
       try {
         // まず既存のフォルダIDを取得を試行
         const result = await authStore.getSubFolderId('invoices')
-        console.log('🔍 getInvoicesFolderId result:', result)
         
         if (!result || !result.id) {
           throw new Error('invoicesフォルダIDが取得できませんでした')
@@ -385,14 +378,10 @@ export const useInvoicesStore = defineStore('invoices', () => {
         
         return result.id
       } catch (getErr) {
-        console.log('⚠️ Failed to get existing invoices folder, trying to create...', getErr.message)
-        
         // フォルダが存在しない場合は作成を試行
         try {
-          console.log('📁 Creating invoices folder...')
           const appFolder = await authStore.getAppFolderId()
           const newFolder = await googleApiClient.createFolder(token, 'invoices', appFolder.id)
-          console.log('✅ Created invoices folder:', newFolder.id)
           
           // ローカルストレージに保存
           localStorage.setItem('invoicy_invoices_folder_id', newFolder.id)
@@ -435,15 +424,7 @@ export const useInvoicesStore = defineStore('invoices', () => {
       }
       
       // 同じIDの請求書を削除（上書き準備）
-      const beforeCount = existingInvoices.length
       const filteredInvoices = existingInvoices.filter(inv => inv.id !== newInvoice.id)
-      const removedCount = beforeCount - filteredInvoices.length
-      
-      if (removedCount > 0) {
-        console.log(`✅ Found existing invoice with ID: ${newInvoice.id}, will be overwritten`)
-      } else {
-        console.log(`ℹ️ No existing invoice found with ID: ${newInvoice.id}, will be added as new`)
-      }
       
       // 新しい請求書を追加
       const updatedInvoices = [...filteredInvoices, newInvoice]
@@ -500,7 +481,6 @@ export const useInvoicesStore = defineStore('invoices', () => {
           
           // ファイルが空になったら削除
           if (existingInvoices.length === 0) {
-            console.log(`🗑️ File ${fileName} is empty after deletion, removing file...`)
             await googleApiClient.deleteFile(token, file.id)
             return { fileDeleted: true }
           } else {
@@ -511,7 +491,6 @@ export const useInvoicesStore = defineStore('invoices', () => {
           }
         } else {
           // ファイルが空の場合は削除
-          console.log(`🗑️ File ${fileName} is empty, removing file...`)
           await googleApiClient.deleteFile(token, file.id)
           return { fileDeleted: true }
         }

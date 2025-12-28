@@ -556,6 +556,8 @@ const productAnalysis = computed(() => {
   const productMap = new Map()
 
   inMemorySales.value.forEach(sale => {
+    // 取消伝票は数量・金額とも符号を反転させて集計する
+    const sign = sale.isNegative ? -1 : 1
     sale.lines.forEach(line => {
       if (!productMap.has(line.productId)) {
         productMap.set(line.productId, {
@@ -565,14 +567,17 @@ const productAnalysis = computed(() => {
         })
       }
       const productData = productMap.get(line.productId)
-      productData.quantity += line.quantity
-      productData.totalInclTax += line.calculateSubtotalInclTax()
+      productData.quantity += line.quantity * sign
+      productData.totalInclTax += line.calculateSubtotalInclTax() * sign
     })
   })
 
   // 商品マスター情報を追加
   const result = []
   productMap.forEach((data, productId) => {
+    // 符号反転後に数量が0になる商品はランキング対象外
+    if (data.quantity === 0) return
+
     const product = inMemoryProducts.value.find(p => p.id === productId)
     result.push({
       productId,

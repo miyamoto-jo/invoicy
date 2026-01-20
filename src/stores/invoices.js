@@ -144,7 +144,9 @@ export const useInvoicesStore = defineStore('invoices', () => {
       
       // 月次ファイル名の生成（YYYY-MM-invoices.jsonl）
       const yearMonth = invoiceData.period.replace('年', '-').replace('月分', '')
-      const fileName = `${yearMonth}-invoices.jsonl`
+      const [year, month] = yearMonth.split('-')
+      const normalizedYearMonth = `${year}-${String(parseInt(month)).padStart(2, '0')}`
+      const fileName = `${normalizedYearMonth}-invoices.jsonl`
       
       // 月次ファイルを更新（InvoiceインスタンスをJSONに変換）
       await updateMonthlyInvoices(token, invoicesFolderId, fileName, newInvoice.toJSON())
@@ -225,7 +227,9 @@ export const useInvoicesStore = defineStore('invoices', () => {
         
         // 月次ファイル名の生成
         const yearMonth = invoiceData.period.replace('年', '-').replace('月分', '')
-        const fileName = `${yearMonth}-invoices.jsonl`
+        const [year, month] = yearMonth.split('-')
+        const normalizedYearMonth = `${year}-${String(parseInt(month)).padStart(2, '0')}`
+        const fileName = `${normalizedYearMonth}-invoices.jsonl`
         
         if (!invoicesByMonth[fileName]) {
           invoicesByMonth[fileName] = []
@@ -527,7 +531,9 @@ export const useInvoicesStore = defineStore('invoices', () => {
       
       // 月次ファイル名の生成（YYYY-MM-invoices.jsonl）
       const yearMonth = invoiceToDelete.period.replace('年', '-').replace('月分', '')
-      const fileName = `${yearMonth}-invoices.jsonl`
+      const [year, month] = yearMonth.split('-')
+      const normalizedYearMonth = `${year}-${String(parseInt(month)).padStart(2, '0')}`
+      const fileName = `${normalizedYearMonth}-invoices.jsonl`
       
       // 月次ファイルから請求書を削除
       await removeInvoiceFromMonthlyFile(token, invoicesFolderId, fileName, invoiceId)

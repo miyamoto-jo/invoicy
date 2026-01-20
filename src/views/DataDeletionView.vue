@@ -180,6 +180,22 @@ const formatFileName = (fileName, dataType) => {
   return fileName
 }
 
+// ファイル名から年月を抽出してソート用の数値を作成
+const getYearMonthForSort = (fileName, dataType) => {
+  if (dataType === 'sales') {
+    const match = fileName.match(/ledger-(\d{4})(\d{2})\.jsonl/)
+    if (match) {
+      return parseInt(match[1] + match[2]) // yyyymm形式の数値
+    }
+  } else if (dataType === 'invoices') {
+    const match = fileName.match(/(\d{4})-(\d{2})-invoices\.jsonl/)
+    if (match) {
+      return parseInt(match[1] + match[2]) // yyyymm形式の数値
+    }
+  }
+  return 0
+}
+
 // ファイルサイズをユーザーにわかりやすい形式に変換
 const formatFileSize = (bytes) => {
   if (bytes === 0) return '0バイト'
@@ -252,15 +268,18 @@ const loadFiles = async () => {
     const data = await googleApiClient.searchFiles(token, query, fields)
 
     if (data.files && data.files.length > 0) {
-      files.value = data.files.map(file => ({
-        id: file.id,
-        name: file.name,
-        displayName: formatFileName(file.name, selectedDataType.value),
-        size: parseInt(file.size) || 0,
-        formattedSize: formatFileSize(parseInt(file.size) || 0),
-        modifiedTime: file.modifiedTime,
-        formattedDate: formatDate(file.modifiedTime)
-      }))
+      files.value = data.files
+        .map(file => ({
+          id: file.id,
+          name: file.name,
+          displayName: formatFileName(file.name, selectedDataType.value),
+          size: parseInt(file.size) || 0,
+          formattedSize: formatFileSize(parseInt(file.size) || 0),
+          modifiedTime: file.modifiedTime,
+          formattedDate: formatDate(file.modifiedTime),
+          sortKey: getYearMonthForSort(file.name, selectedDataType.value)
+        }))
+        .sort((a, b) => a.sortKey - b.sortKey) // 古い順にソート
     } else {
       files.value = []
     }

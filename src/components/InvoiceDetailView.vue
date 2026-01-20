@@ -37,6 +37,7 @@
     <!-- 明細一覧 -->
     <div class="invoice-details">
       <h3>明細</h3>
+      <!-- デスクトップ表示用テーブル -->
       <div class="details-table">
         <div class="table-header">
           <div class="col-date">注文日</div>
@@ -59,6 +60,63 @@
           <div class="col-tax-rate">{{ formatTaxRate(detail.taxRate) }}</div>
         </div>
       </div>
+      <!-- スマホ表示用カード（日付ごとにグループ化） -->
+      <div class="details-cards">
+        <div 
+          v-for="(group, dateKey) in groupedDetails" 
+          :key="dateKey"
+          class="date-group"
+        >
+          <!-- 日付ヘッダー（クリック可能） -->
+          <div 
+            class="date-header"
+            @click="toggleDateGroup(dateKey)"
+          >
+            <div class="date-header-content">
+              <span class="date-label">{{ formatDate(group.date) }}</span>
+              <span class="date-count">（{{ group.details.length }}件）</span>
+            </div>
+            <div class="date-toggle-icon" :class="{ 'expanded': expandedDates[dateKey] }">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <!-- 明細カード（展開時のみ表示） -->
+          <div 
+            v-show="expandedDates[dateKey]"
+            class="date-details"
+          >
+            <div 
+              v-for="(detail, index) in group.details" 
+              :key="index"
+              class="detail-card"
+            >
+              <div class="card-header">
+                <div class="card-product-name">{{ detail.productName }}</div>
+              </div>
+              <div class="card-body">
+                <div class="card-row">
+                  <span class="card-label">数量</span>
+                  <span class="card-value">{{ detail.quantity }}</span>
+                </div>
+                <div class="card-row">
+                  <span class="card-label">単価(税抜)</span>
+                  <span class="card-value">¥{{ detail.formatPrice() }}</span>
+                </div>
+                <div class="card-row">
+                  <span class="card-label">税率</span>
+                  <span class="card-value">{{ formatTaxRate(detail.taxRate) }}</span>
+                </div>
+                <div class="card-row card-total">
+                  <span class="card-label">合計(税抜)</span>
+                  <span class="card-value">¥{{ detail.formatSubtotal() }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 作成情報 -->
@@ -73,11 +131,58 @@
 </template>
 
 <script setup>
+import { ref, computed, onMounted } from 'vue'
+
 const props = defineProps({
   invoice: {
     type: Object,
     required: true
   }
+})
+
+// 日付ごとの展開状態を管理（デフォルトは全て展開）
+const expandedDates = ref({})
+
+// 日付をキーとして取得する関数
+const getDateKey = (dateStr) => {
+  const date = new Date(dateStr)
+  return date.toISOString().split('T')[0] // YYYY-MM-DD形式
+}
+
+// 日付ごとに明細をグループ化
+const groupedDetails = computed(() => {
+  const groups = {}
+  
+  props.invoice.details.forEach(detail => {
+    const dateKey = getDateKey(detail.orderDate)
+    if (!groups[dateKey]) {
+      groups[dateKey] = {
+        date: detail.orderDate,
+        details: []
+      }
+    }
+    groups[dateKey].details.push(detail)
+  })
+  
+  // 日付の昇順でソート（古い日付が上）
+  return Object.keys(groups)
+    .sort((a, b) => a.localeCompare(b))
+    .reduce((sorted, dateKey) => {
+      sorted[dateKey] = groups[dateKey]
+      return sorted
+    }, {})
+})
+
+// 日付グループの展開/折りたたみを切り替え
+const toggleDateGroup = (dateKey) => {
+  expandedDates.value[dateKey] = !expandedDates.value[dateKey]
+}
+
+// 初期化時に全ての日付グループを展開状態にする
+onMounted(() => {
+  Object.keys(groupedDetails.value).forEach(dateKey => {
+    expandedDates.value[dateKey] = true
+  })
 })
 
 // Methods
@@ -242,6 +347,10 @@ const formatTaxRate = (taxRate) => {
   overflow-x: auto;
 }
 
+.details-cards {
+  display: none;
+}
+
 .table-header {
   display: grid;
   grid-template-columns: 1.35fr 2fr 0.8fr 1fr 1fr 0.8fr;
@@ -393,82 +502,140 @@ const formatTaxRate = (taxRate) => {
     font-size: 1rem;
   }
   
+  /* スマホ表示時はテーブルを非表示 */
   .details-table {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: 0 -1rem;
-    padding: 0 1rem;
+    display: none;
   }
   
-  .table-header {
-    display: grid;
-    /* モバイル時は横スクロール前提で列幅をゆったり確保 */
-    grid-template-columns: 1.1fr 2fr 0.7fr 1fr 1fr 0.8fr;
-    gap: 0.5rem;
-    padding: 0.75rem 0.5rem;
-    background: #f8f9fa;
-    font-weight: 600;
-    color: #333;
-    font-size: 0.8rem;
-    border-bottom: 2px solid #e0e0e0;
-    min-width: 420px;
+  /* スマホ表示時はカードを表示 */
+  .details-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0 1rem 1rem 1rem;
   }
   
-  .table-row {
-    display: grid;
-    grid-template-columns: 1.1fr 2fr 0.7fr 1fr 1fr 0.8fr;
-    gap: 0.5rem;
-    padding: 0.75rem 0.5rem;
-    border-bottom: 1px solid #f0f0f0;
-    font-size: 0.8rem;
-    min-width: 420px;
+  .date-group {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
   }
   
-  .table-row:last-child {
-    border-bottom: none;
+  .date-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #007bff;
+    color: white;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s;
   }
   
-  .table-row > div {
+  .date-header:hover {
+    background: #0056b3;
+  }
+  
+  .date-header-content {
     display: flex;
     align-items: center;
-    padding: 0.1rem 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    gap: 0.5rem;
   }
   
-  .col-date {
-    text-align: center;
-    font-weight: 500;
-  }
-  
-  .col-product {
-    text-align: left;
-    font-weight: 500;
-    line-height: 1.1;
-    white-space: normal;
-    word-break: break-word;
-  }
-  
-  .col-quantity {
-    text-align: left;
-    font-weight: 500;
-  }
-  
-  .col-price {
-    text-align: left;
-    font-weight: 500;
-  }
-  
-  .col-total {
-    text-align: left;
+  .date-label {
     font-weight: 600;
-    color: #007bff;
+    font-size: 1rem;
   }
   
-  .col-tax-rate {
-    text-align: left;
+  .date-count {
+    font-size: 0.85rem;
+    opacity: 0.9;
+  }
+  
+  .date-toggle-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+    color: white;
+  }
+  
+  .date-toggle-icon.expanded {
+    transform: rotate(180deg);
+  }
+  
+  .date-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+  }
+  
+  .detail-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.875rem;
+    background: white;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .card-product-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #333;
+    flex: 1;
+  }
+  
+  .card-body {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+  }
+  
+  .card-label {
+    color: #666;
+    font-size: 0.85rem;
+  }
+  
+  .card-value {
+    color: #333;
     font-weight: 500;
+  }
+  
+  .card-row.card-total {
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 2px solid #007bff;
+  }
+  
+  .card-row.card-total .card-label {
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .card-row.card-total .card-value {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #007bff;
   }
   
   .invoice-footer {
@@ -528,31 +695,56 @@ const formatTaxRate = (taxRate) => {
     font-size: 0.95rem;
   }
   
-  .table-header,
-  .table-row {
-    padding: 0.5rem 0.75rem;
+  .details-cards {
+    padding: 0 0.75rem 0.75rem 0.75rem;
+    gap: 0.75rem;
   }
   
-  .table-header > div,
-  .table-row > div {
-    padding: 0.375rem 0;
+  .date-header {
+    padding: 0.875rem;
   }
   
-  .table-header > div::before,
-  .table-row > div::before {
-    font-size: 0.75rem;
+  .date-label {
+    font-size: 0.95rem;
   }
   
-  .col-date,
-  .col-quantity,
-  .col-price,
-  .col-total,
-  .col-tax-rate {
+  .date-count {
     font-size: 0.8rem;
   }
   
-  .col-product {
+  .date-details {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .card-header {
+    padding: 0.75rem;
+  }
+  
+  .card-product-name {
+    font-size: 0.9rem;
+  }
+  
+  .card-body {
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+  
+  .card-row {
     font-size: 0.85rem;
+  }
+  
+  .card-label {
+    font-size: 0.8rem;
+  }
+  
+  .card-row.card-total {
+    margin-top: 0.25rem;
+    padding-top: 0.5rem;
+  }
+  
+  .card-row.card-total .card-value {
+    font-size: 0.95rem;
   }
   
   .invoice-footer {
@@ -584,6 +776,15 @@ const formatTaxRate = (taxRate) => {
     margin-bottom: 1rem;
   }
   
+  /* 印刷時はテーブルを表示 */
+  .details-table {
+    display: block;
+  }
+  
+  /* 印刷時はカードを非表示 */
+  .details-cards {
+    display: none;
+  }
   
   .table-header,
   .table-row {

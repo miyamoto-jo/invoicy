@@ -187,6 +187,13 @@ const generateCustomerPdf = async (customer, pdf, isFirstPageOfDocument = false)
     }
   })
   
+  // orderDateの昇順でソート
+  allDetails.sort((a, b) => {
+    const dateA = a.orderDate || ''
+    const dateB = b.orderDate || ''
+    return dateA.localeCompare(dateB)
+  })
+  
   // 税率ごとの集計
   const taxRateGroups = {}
   allDetails.forEach(detail => {

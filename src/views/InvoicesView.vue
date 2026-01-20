@@ -266,7 +266,10 @@ const filteredInvoices = computed(() => {
         return false // periodが存在しない場合はフィルタから除外
       }
       const invoiceYearMonth = invoice.period.replace('年', '-').replace('月分', '')
-      return invoiceYearMonth === searchFilters.value.period
+      // 月をゼロ埋めして正規化
+      const [year, month] = invoiceYearMonth.split('-')
+      const normalizedInvoiceYearMonth = `${year}-${String(parseInt(month)).padStart(2, '0')}`
+      return normalizedInvoiceYearMonth === searchFilters.value.period
     })
   }
   

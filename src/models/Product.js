@@ -91,11 +91,11 @@ export class Product {
   }
 
   /**
-   * 表示名の取得（alias優先、なければname）
+   * 表示名の取得（name優先、なければalias）
    * @returns {string} 表示名
    */
   getDisplayName() {
-    return this.alias || this.name
+    return this.name || this.alias
   }
 
   /**

@@ -51,21 +51,28 @@
       <!-- 商品明細（カード形式） -->
       <div class="form-group">
         <label class="form-label">商品明細 *</label>
+        <input
+          v-model="productSearchQuery"
+          type="search"
+          class="form-input product-search-input"
+          :disabled="!formData.customerId"
+          placeholder="商品名/管理名称で検索（部分一致）"
+        >
         <div v-if="!formData.customerId" class="customer-notice">
           顧客を選択すると商品が表示されます
         </div>
         
         <!-- 商品カードグリッド -->
-        <div v-else class="product-cards-grid">
+        <div v-else-if="filteredAvailableProducts.length > 0" class="product-cards-grid">
           <div 
-            v-for="product in availableProducts" 
+            v-for="product in filteredAvailableProducts" 
             :key="product.id" 
             class="product-card"
             :class="{ 'has-items': getProductQuantity(product.id) > 0 }"
             @click="addProductToCart(product)"
           >
             <div class="product-card-content">
-              <div class="product-name">{{ product.getDisplayName() }}</div>
+              <div class="product-name">{{ product.getDisplayNameForStaff() }}</div>
               <div class="product-price">¥{{ product.formatPrice() }}</div>
               
               <!-- マイナスボタン -->
@@ -90,6 +97,9 @@
               </div>
             </div>
           </div>
+        </div>
+        <div v-else class="no-products-notice">
+          商品がありません
         </div>
         
         <!-- 選択された商品の一覧 -->
@@ -313,6 +323,23 @@ const availableProducts = computed(() => {
   return products.value.filter(product => {
     // モデルのメソッドを使用
     return product.isAvailableForCustomer(formData.value.customerId)
+  })
+})
+
+const productSearchQuery = ref('')
+
+const normalizeForSearch = (value) => {
+  return String(value ?? '').normalize('NFKC').toLowerCase()
+}
+
+const filteredAvailableProducts = computed(() => {
+  const query = normalizeForSearch(productSearchQuery.value).trim()
+  if (!query) return availableProducts.value
+
+  return availableProducts.value.filter(product => {
+    const hasAlias = typeof product?.alias === 'string' && product.alias.trim() !== ''
+    const target = hasAlias ? product.alias : product?.name
+    return normalizeForSearch(target).includes(query)
   })
 })
 
@@ -764,6 +791,9 @@ watch(() => formData.value.customerId, (newCustomerId, oldCustomerId) => {
     // 顧客が変更された場合、選択された商品をリセット
     selectedProducts.value = []
   }
+  if (newCustomerId !== oldCustomerId) {
+    productSearchQuery.value = ''
+  }
 })
 
 // Watch for taxes and settings to set default tax rate when available
@@ -801,6 +831,20 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   text-align: center;
   color: #666;
   border: 1px dashed #ddd;
+}
+
+.product-search-input {
+  margin: 0.5rem 0 1rem 0;
+}
+
+.no-products-notice {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 4px;
+  text-align: center;
+  color: #666;
+  border: 1px dashed #ddd;
+  margin-bottom: 1.5rem;
 }
 
 /* 商品カードグリッド */

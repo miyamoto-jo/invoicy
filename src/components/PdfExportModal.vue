@@ -368,7 +368,7 @@ const createDetailPageHtml = (customer, year, month, pageDetails, pageIndex, isL
       </div>
       
       <div style="margin-bottom: ${PDF_CONFIG.marginBottom};">
-        <p style="margin: 5px 0; font-size: ${PDF_CONFIG.fontSize.normal};">${year}年${month}月分 No.${String(pageIndex + 1).padStart(3, '0')}</p>
+        <p style="margin: 5px 0; font-size: ${PDF_CONFIG.fontSize.normal};">${year}年${month}分 No.${String(pageIndex + 1).padStart(3, '0')}</p>
         <p style="margin: 5px 0; font-weight: ${PDF_CONFIG.fontWeightBold}; font-size: ${PDF_CONFIG.fontSize.large};">${customer.customerName}　様</p>
         <p style="margin: 10px 0; font-size: ${PDF_CONFIG.fontSize.xxsmall};">下記のとおり御請求申し上げます</p>
       </div>

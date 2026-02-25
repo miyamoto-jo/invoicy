@@ -324,7 +324,7 @@ const createFirstPageHtml = (customer, year, month, totalAmount, totalTax, total
       </div>
       
       <div style="margin-bottom: 30px;">
-        <p style="margin: 10px 0; font-size: ${PDF_CONFIG.fontSize.normal};">${year}年${month}月分</p>
+        <p style="margin: 10px 0; font-size: ${PDF_CONFIG.fontSize.normal};">${year}年${month}分</p>
         <p style="margin: 3px 0; font-size: ${PDF_CONFIG.fontSize.large}; font-weight: ${PDF_CONFIG.fontWeightBold}; text-decoration: underline;">${customer.customerName}　様</p>
         <p style="font-size: ${PDF_CONFIG.fontSize.xsmall};">毎月${customer.invoices[0]?.closingDay || '末'}〆切</p>
       </div>

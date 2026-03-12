@@ -6,6 +6,7 @@
  * @property {number} quantity - 数量
  * @property {number} priceExclTax - 税抜単価
  * @property {number} taxRate - 税率（パーセント）
+ * @property {boolean} isEdit - 編集済みフラグ
  */
 
 /**
@@ -21,6 +22,7 @@ export class SaleLine {
     this.quantity = data.quantity
     this.priceExclTax = data.priceExclTax
     this.taxRate = data.taxRate
+    this.isEdit = data.isEdit ?? false
   }
 
   /**
@@ -66,7 +68,8 @@ export class SaleLine {
       productName: this.productName,
       quantity: this.quantity,
       priceExclTax: this.priceExclTax,
-      taxRate: this.taxRate
+      taxRate: this.taxRate,
+      isEdit: this.isEdit
     }
   }
 

@@ -72,7 +72,9 @@
           v-for="(line, index) in sale.lines" 
           :key="index"
           class="table-row"
+          :class="{ 'is-edited': line.isEdit }"
         >
+          <span v-if="line.isEdit" class="line-edited-badge">マスタ未登録</span>
           <div class="col-product">{{ line.productName }}</div>
           <div class="col-quantity">{{ line.quantity }}</div>
           <div class="col-price">¥{{ line.formatPrice() }}</div>
@@ -423,6 +425,11 @@ const executeVoid = async () => {
   gap: 1rem;
   padding: 1rem;
   border-bottom: 1px solid #e0e0e0;
+  position: relative;
+}
+
+.table-row.is-edited {
+  padding-top: 2rem;
 }
 
 .table-row:last-child {
@@ -431,6 +438,21 @@ const executeVoid = async () => {
 
 .table-row:hover {
   background-color: #f8f9fa;
+}
+
+.line-edited-badge {
+  position: absolute;
+  top: 0.55rem;
+  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #155724;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
 }
 
 .col-product {
@@ -593,6 +615,15 @@ const executeVoid = async () => {
   .table-row {
     grid-template-columns: 1fr;
     gap: 0.5rem;
+  }
+
+  .table-row.is-edited {
+    padding-top: 2.2rem;
+  }
+
+  .line-edited-badge {
+    top: 0.5rem;
+    right: 0.75rem;
   }
 
   .table-header > div,

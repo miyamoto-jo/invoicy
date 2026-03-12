@@ -135,7 +135,7 @@
               </thead>
               <tbody>
                 <tr v-for="(product, index) in productAnalysis" :key="product.productId">
-                  <td>{{ formatRank(index + 1) }}</td>
+                  <td>{{ getProductRankLabel(productAnalysis, index) }}</td>
                   <td>{{ product.displayName }}</td>
                   <td>{{ product.quantity }}</td>
                   <td>¥{{ formatNumber(product.totalInclTax) }}</td>
@@ -298,7 +298,7 @@
               </thead>
               <tbody>
                 <tr v-for="(product, index) in productAnalysis" :key="product.productId">
-                  <td>{{ formatRank(index + 1) }}</td>
+                  <td>{{ getProductRankLabel(productAnalysis, index) }}</td>
                   <td>{{ product.displayName }}</td>
                   <td>{{ product.quantity }}</td>
                   <td>¥{{ formatNumber(product.totalInclTax) }}</td>
@@ -332,6 +332,7 @@ import AppLayout from '../components/AppLayout.vue'
 import { useSalesStore } from '../stores/sales'
 import { useCustomersStore } from '../stores/customers'
 import { useProductsStore } from '../stores/products'
+import { UNREGISTERED_MASTER_PRODUCT_ID } from '../constants/productIds'
 
 // Chart.jsの登録
 ChartJS.register(
@@ -579,9 +580,12 @@ const productAnalysis = computed(() => {
     if (data.quantity === 0) return
 
     const product = inMemoryProducts.value.find(p => p.id === productId)
+    const isUnregisteredMasterProduct = productId === UNREGISTERED_MASTER_PRODUCT_ID
     result.push({
       productId,
-      displayName: product ? product.getDisplayName() : '削除済み商品',
+      displayName: isUnregisteredMasterProduct
+        ? 'マスタ未登録商品'
+        : (product ? product.getDisplayName() : '削除済み商品'),
       quantity: data.quantity,
       totalInclTax: data.totalInclTax
     })
@@ -713,6 +717,20 @@ const formatRank = (rank) => {
   if (rank === 2) return '🥈'
   if (rank === 3) return '🥉'
   return rank
+}
+
+const getProductRankLabel = (products, index) => {
+  const current = products[index]
+  if (!current) return ''
+  if (current.productId === UNREGISTERED_MASTER_PRODUCT_ID) return '順位外'
+
+  let rank = 0
+  for (let i = 0; i <= index; i++) {
+    if (products[i].productId !== UNREGISTERED_MASTER_PRODUCT_ID) {
+      rank++
+    }
+  }
+  return formatRank(rank)
 }
 
 // Lifecycle

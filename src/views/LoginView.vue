@@ -138,7 +138,7 @@ const retryAuth = async () => {
   }
   
   .logo-image {
-    width: 200px;
+    width: 120px;
     height: auto;
     max-height: 70px;
   }

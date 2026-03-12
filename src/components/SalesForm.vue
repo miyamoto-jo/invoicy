@@ -111,14 +111,26 @@
               :key="`${item.productId}-${index}`" 
               class="selected-product-item"
             >
-              <button
-                type="button"
-                class="selected-product-remove-btn"
-                aria-label="明細を削除"
-                @click="removeSelectedProduct(index)"
-              >
-                ×
-              </button>
+              <div class="selected-product-header">
+                <span v-if="item.isEdit" class="edited-badge">マスタ未登録</span>
+                <div class="selected-product-actions">
+                  <button
+                    type="button"
+                    class="selected-product-edit-btn"
+                    @click="openLineEditModal(index)"
+                  >
+                    編集
+                  </button>
+                  <button
+                    type="button"
+                    class="selected-product-remove-btn"
+                    aria-label="明細を削除"
+                    @click="removeSelectedProduct(index)"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
               <div class="selected-product-content">
                 <span class="product-name">{{ item.productName }}</span>
                 <span class="quantity">× {{ item.quantity }}</span>
@@ -257,6 +269,58 @@
         </div>
       </div>
     </div>
+
+    <!-- 明細編集モーダル -->
+    <div v-if="showLineEditModal" class="modal-overlay" @click="closeLineEditModal">
+      <div class="modal-content" @click.stop>
+        <h3>明細を編集</h3>
+        <div class="modal-form">
+          <label class="form-label">商品名</label>
+          <input
+            v-model="lineEditForm.productName"
+            type="text"
+            class="form-input"
+            placeholder="商品名を入力"
+          >
+
+          <label class="form-label modal-field-spacer">数量（1〜999）</label>
+          <input
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            class="form-input"
+            :value="lineEditForm.quantityInput"
+            placeholder="1〜999の半角数字"
+            @input="onLineEditQuantityInput"
+          >
+          <div v-if="lineEditForm.quantityInput !== '' && !isLineEditQuantityValid" class="error-message">
+            1〜999の半角数字で入力してください
+          </div>
+
+          <label class="form-label modal-field-spacer">税抜単価（1〜9999999）</label>
+          <input
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            class="form-input"
+            :value="lineEditForm.priceInput"
+            placeholder="1〜9999999の半角数字"
+            @input="onLineEditPriceInput"
+          >
+          <div v-if="lineEditForm.priceInput !== '' && !isLineEditPriceValid" class="error-message">
+            1〜9999999の半角数字で入力してください
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" @click="closeLineEditModal">
+            キャンセル
+          </button>
+          <button type="button" class="btn btn-primary" :disabled="!isLineEditFormValid" @click="applyLineEdit">
+            更新
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -268,6 +332,7 @@ import { useTaxesStore } from '../stores/taxes'
 import { useSalesStore } from '../stores/sales'
 import { useSettingsStore } from '../stores/setting'
 import { useLoading } from '../composables/useLoading'
+import { UNREGISTERED_MASTER_PRODUCT_ID } from '../constants/productIds'
 
 // Props
 const props = defineProps({
@@ -310,6 +375,13 @@ const showCancelDialog = ref(false)
 const showQuantityModal = ref(false)
 const quantityInput = ref('')
 const modalProduct = ref(null)
+const showLineEditModal = ref(false)
+const editingLineIndex = ref(null)
+const lineEditForm = ref({
+  productName: '',
+  quantityInput: '',
+  priceInput: ''
+})
 
 // ローカルメモリでの売上情報保持
 const localSales = ref([])
@@ -380,6 +452,24 @@ const isQuantityInputValid = computed(() => {
   if (!/^\d{1,3}$/.test(value)) return false
   const numericValue = Number(value)
   return numericValue >= 0 && numericValue <= 999
+})
+
+const isLineEditQuantityValid = computed(() => {
+  const value = lineEditForm.value.quantityInput.trim()
+  if (!/^\d{1,3}$/.test(value)) return false
+  const numericValue = Number(value)
+  return numericValue >= 1 && numericValue <= 999
+})
+
+const isLineEditPriceValid = computed(() => {
+  const value = lineEditForm.value.priceInput.trim()
+  if (!/^\d{1,7}$/.test(value)) return false
+  const numericValue = Number(value)
+  return numericValue >= 1 && numericValue <= 9999999
+})
+
+const isLineEditFormValid = computed(() => {
+  return isLineEditQuantityValid.value && isLineEditPriceValid.value
 })
 
 const totals = computed(() => {
@@ -490,7 +580,8 @@ const populateInitialLines = () => {
       alias: line.alias || product?.alias || '',
       quantity: line.quantity ?? 0,
       priceExclTax: line.priceExclTax ?? product?.priceExclTax ?? 0,
-      taxRate: line.taxRate ?? formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+      taxRate: line.taxRate ?? formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10,
+      isEdit: line.isEdit ?? false
     }
   })
 
@@ -514,7 +605,8 @@ const addProductToCart = (product) => {
       alias: product.alias,
       quantity: 1,
       priceExclTax: product.priceExclTax,
-      taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+      taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10,
+      isEdit: false
     })
   }
 }
@@ -541,7 +633,8 @@ const setProductQuantity = (product, quantity) => {
       alias: product.alias,
       quantity: normalizedQuantity,
       priceExclTax: product.priceExclTax,
-      taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+      taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10,
+      isEdit: false
     })
   }
 }
@@ -564,6 +657,62 @@ const removeSelectedProduct = (index) => {
   selectedProducts.value.splice(index, 1)
 }
 
+const openLineEditModal = (index) => {
+  const item = selectedProducts.value[index]
+  if (!item) return
+
+  editingLineIndex.value = index
+  lineEditForm.value = {
+    productName: item.productName ?? '',
+    quantityInput: String(item.quantity ?? ''),
+    priceInput: String(item.priceExclTax ?? '')
+  }
+  showLineEditModal.value = true
+}
+
+const closeLineEditModal = () => {
+  showLineEditModal.value = false
+  editingLineIndex.value = null
+  lineEditForm.value = {
+    productName: '',
+    quantityInput: '',
+    priceInput: ''
+  }
+}
+
+const onLineEditQuantityInput = (event) => {
+  lineEditForm.value.quantityInput = event.target.value.slice(0, 3)
+}
+
+const onLineEditPriceInput = (event) => {
+  lineEditForm.value.priceInput = event.target.value.slice(0, 7)
+}
+
+const applyLineEdit = () => {
+  if (editingLineIndex.value === null || !isLineEditFormValid.value) return
+  const item = selectedProducts.value[editingLineIndex.value]
+  if (!item) return
+
+  const nextProductName = lineEditForm.value.productName
+  const nextQuantity = Number(lineEditForm.value.quantityInput)
+  const nextPriceExclTax = Number(lineEditForm.value.priceInput)
+  const isQuantityOnlyChange =
+    item.productName === nextProductName &&
+    item.priceExclTax === nextPriceExclTax &&
+    item.quantity !== nextQuantity
+
+  item.productName = lineEditForm.value.productName
+  item.quantity = nextQuantity
+  item.priceExclTax = nextPriceExclTax
+  item.taxRate = formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+  if (!isQuantityOnlyChange) {
+    item.productId = UNREGISTERED_MASTER_PRODUCT_ID
+    item.isEdit = true
+  }
+
+  closeLineEditModal()
+}
+
 const getProductQuantity = (productId) => {
   const item = selectedProducts.value.find(item => item.productId === productId)
   return item ? item.quantity : 0
@@ -583,7 +732,8 @@ const buildLinesPayload = () => {
     alias: item.alias,
     quantity: item.quantity,
     priceExclTax: item.priceExclTax,
-    taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10
+    taxRate: formData.value.invoiceTaxRate ?? defaultTaxRate.value ?? 10,
+    isEdit: item.isEdit ?? false
   }))
 }
 
@@ -975,8 +1125,9 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
 
 .selected-product-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
   padding: 0.5rem;
   background: white;
   border-radius: 4px;
@@ -988,6 +1139,34 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   align-items: center;
   gap: 1rem;
   min-width: 0;
+}
+
+.selected-product-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.edited-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #155724;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.selected-product-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-left: auto;
 }
 
 .selected-product-item .product-name {
@@ -1006,7 +1185,6 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
 }
 
 .selected-product-remove-btn {
-  margin-left: auto;
   border: none;
   background: transparent;
   color: #666;
@@ -1018,6 +1196,21 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
 
 .selected-product-remove-btn:hover {
   color: #dc3545;
+}
+
+.selected-product-edit-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #333;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+}
+
+.selected-product-edit-btn:hover {
+  border-color: #007bff;
+  color: #007bff;
 }
 
 .totals-section {
@@ -1150,6 +1343,11 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   text-align: left;
 }
 
+.modal-field-spacer {
+  display: block;
+  margin-top: 0.75rem;
+}
+
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
   .product-cards-grid {
@@ -1189,9 +1387,5 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
     gap: 0.5rem;
   }
 
-  .selected-product-remove-btn {
-    align-self: flex-end;
-    margin-left: 0;
-  }
 }
 </style> 

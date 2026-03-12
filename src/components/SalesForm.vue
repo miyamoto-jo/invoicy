@@ -111,9 +111,19 @@
               :key="`${item.productId}-${index}`" 
               class="selected-product-item"
             >
-              <span class="product-name">{{ item.productName }}</span>
-              <span class="quantity">× {{ item.quantity }}</span>
-              <span class="price">¥{{ formatNumber(item.priceExclTax * item.quantity) }}</span>
+              <button
+                type="button"
+                class="selected-product-remove-btn"
+                aria-label="明細を削除"
+                @click="removeSelectedProduct(index)"
+              >
+                ×
+              </button>
+              <div class="selected-product-content">
+                <span class="product-name">{{ item.productName }}</span>
+                <span class="quantity">× {{ item.quantity }}</span>
+                <span class="price">¥{{ formatNumber(item.priceExclTax * item.quantity) }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -550,6 +560,10 @@ const removeProductFromCart = (product) => {
   }
 }
 
+const removeSelectedProduct = (index) => {
+  selectedProducts.value.splice(index, 1)
+}
+
 const getProductQuantity = (productId) => {
   const item = selectedProducts.value.find(item => item.productId === productId)
   return item ? item.quantity : 0
@@ -969,6 +983,13 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
   border: 1px solid #e0e0e0;
 }
 
+.selected-product-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
 .selected-product-item .product-name {
   font-weight: 500;
   color: #333;
@@ -982,6 +1003,21 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
 .selected-product-item .price {
   font-weight: 600;
   color: #333;
+}
+
+.selected-product-remove-btn {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+.selected-product-remove-btn:hover {
+  color: #dc3545;
 }
 
 .totals-section {
@@ -1146,6 +1182,16 @@ watch([taxes, () => settingsStore.businessSettings], ([newTaxes, newSettings]) =
     flex-direction: column;
     align-items: flex-start;
     gap: 0.25rem;
+  }
+
+  .selected-product-content {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .selected-product-remove-btn {
+    align-self: flex-end;
+    margin-left: 0;
   }
 }
 </style> 

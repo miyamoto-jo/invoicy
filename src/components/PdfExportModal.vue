@@ -121,7 +121,12 @@ const exportPdf = async () => {
     return
   }
   
-  const pdf = new jsPDF('p', 'mm', 'a4')
+  const pdf = new jsPDF({
+    orientation: 'p',
+    unit: 'mm',
+    format: 'a4',
+    compress: true
+  })
   let isFirstPage = true
   
   try {
@@ -260,7 +265,10 @@ const addPageToPdf = async (pdf, htmlContent, isFirstPage = false) => {
     })
     
     // キャンバスからPDFに追加
-    const imgData = canvas.toDataURL('image/png')
+    // 請求書はページ全体を画像として埋め込むため、可逆圧縮のPNGでは
+    // ページ数に比例してPDFが非常に大きくなる。描画解像度は維持しつつ、
+    // 品質指定JPEGに変換してファイルサイズを抑える。
+    const imgData = canvas.toDataURL(PDF_CONFIG.imageMimeType, PDF_CONFIG.imageQuality)
     const imgWidth = 210
     const imgHeight = (canvas.height * imgWidth) / canvas.width
     
@@ -269,7 +277,16 @@ const addPageToPdf = async (pdf, htmlContent, isFirstPage = false) => {
       pdf.addPage()
     }
     
-    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+    pdf.addImage(
+      imgData,
+      PDF_CONFIG.imageFormat,
+      0,
+      0,
+      imgWidth,
+      imgHeight,
+      undefined,
+      PDF_CONFIG.imageCompression
+    )
     
   } finally {
     // 一時的なDOM要素を削除
@@ -280,6 +297,10 @@ const addPageToPdf = async (pdf, htmlContent, isFirstPage = false) => {
 // PDF設定の定数
 const PDF_CONFIG = {
   itemsPerPage: 20, // 1ページに表示できる明細の行数
+  imageMimeType: 'image/jpeg', // ページ画像を軽量なJPEGとしてPDFに埋め込む
+  imageFormat: 'JPEG', // jsPDFに渡す画像形式
+  imageQuality: 0.82, // 文字の可読性とファイルサイズのバランス
+  imageCompression: 'MEDIUM', // jsPDFの画像圧縮設定
   pagePaddingA: 30, // ページの上下余白px
   pagePaddingB: 40, // ページの左右余白px
   fontFamily: 'MS Gothic', // フォントファミリー

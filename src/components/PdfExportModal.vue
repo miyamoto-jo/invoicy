@@ -372,9 +372,7 @@ const createFirstPageHtml = (customer, year, month, totalAmount, totalTax, total
       <div style="margin-top: 30px;">
         <p style="font-size: ${PDF_CONFIG.fontSize.normal};">お支払いが振込の場合は、下記口座へのお振込をお願いいたします。</p>
         <div style="text-align: ${PDF_CONFIG.textAlignCenter}; margin-top: ${PDF_CONFIG.marginBottom};">
-          <p style="font-size: ${PDF_CONFIG.fontSize.medium}; border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: 20px 50px 20px 50px; display: inline-block;">
-            ${essentialSettings.bankInfo || ''}
-          </p>
+          <p style="font-size: ${PDF_CONFIG.fontSize.medium}; border: ${PDF_CONFIG.borderWidth} solid ${PDF_CONFIG.borderColor}; padding: 20px 50px 20px 50px; display: inline-block; white-space: pre-line;">${essentialSettings.bankInfo || ''}</p>
         </div>
       </div>
     </div>
